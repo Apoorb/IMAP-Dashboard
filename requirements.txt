@@ -1,0 +1,9 @@
+# local package
+-e .
+
+# external requirements
+
+inflection~=0.5.1
+pandas~=1.1.1
+geopandas~=0.8.1
+setuptools~=49.6.0
