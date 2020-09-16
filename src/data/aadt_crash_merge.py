@@ -308,6 +308,13 @@ def scale_crash_by_seg_len(crash_gdf_2_):
     return crash_gdf_2_adj_crash_freq_by_len_
 
 
+def get_missing_aadt_gdf(aadt_gdf__, aadt_but_no_crash_route_set__):
+    return aadt_gdf__.query("route_id in @aadt_but_no_crash_route_set__")
+
+
+def get_missing_crash_gdf(crash_gdf__, aadt_but_no_crash_route_set__):
+    return crash_gdf__.query("route_gis in @aadt_but_no_crash_route_set__")
+
 if __name__ == "__main__":
     path_to_prj_dir = get_project_root()
     path_interim_data = os.path.join(path_to_prj_dir, "data", "interim")
@@ -326,3 +333,6 @@ if __name__ == "__main__":
     )
     out_file_aadt_crash = os.path.join(path_interim_data, "aadt_crash_ncdot.gpkg")
     aadt_crash_gdf.to_file(out_file_aadt_crash, driver="GPKG")
+
+    get_missing_aadt_gdf(aadt_gdf, aadt_but_no_crash_route_set)
+    get_missing_crash_gdf(crash_gdf, aadt_but_no_crash_route_set)
