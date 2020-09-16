@@ -6,7 +6,7 @@ from src.utils import get_project_root
 from src.data.make_dataset import read_shp
 
 
-def fix_aadt_df_type(aadt_df_, max_highway_class=3):
+def fix_aadt_df_type(aadt_df_):
     """
 
     Parameters
@@ -18,7 +18,7 @@ def fix_aadt_df_type(aadt_df_, max_highway_class=3):
     -------
     aadt_df_fil_
     """
-    aadt_df_fil_ = (
+    aadt_df_add_col_ = (
         aadt_df_.rename(columns={"begin_mp": "st_mp_pt", "end_mp": "end_mp_pt"})
         .assign(
             route_id=lambda df: df.route_id.astype(str).str.split(".", expand=True)[0],
@@ -48,9 +48,8 @@ def fix_aadt_df_type(aadt_df_, max_highway_class=3):
                 "geometry",
             ]
         )
-        .loc[lambda df: df.route_class <= max_highway_class]
     )
-    return aadt_df_fil_
+    return aadt_df_add_col_
 
 
 def test_aadt_df(aadt_df_):
@@ -81,7 +80,11 @@ if __name__ == "__main__":
     )
     aadt_gdf = read_shp(aadt_file)
     test_aadt_df(aadt_gdf)
-    aadt_df_fil = fix_aadt_df_type(aadt_gdf)
+    aadt_df_add_col = fix_aadt_df_type(aadt_gdf)
+    set(aadt_df_add_col.route_no.unique())
+    max_highway_class = 3
+    aadt_df_fil = aadt_df_add_col.loc[lambda df: df.route_class <= max_highway_class]
+
     aadt_df_fil = aadt_df_fil.loc[lambda df: ~df.geometry.isnull()]
     aadt_df_fil_4326 = aadt_df_fil.to_crs(epsg=4326)
 
