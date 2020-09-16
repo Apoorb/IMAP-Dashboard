@@ -132,7 +132,9 @@ def merge_aadt_crash(aadt_gdf_, crash_gdf_, quiet=True):
             "seg_len_in_interval": "sum",
         },
     ).reset_index()
-    crash_gdf_adj_crash_by_len_dissolve = get_severity_index(crash_gdf_adj_crash_by_len_dissolve)
+    crash_gdf_adj_crash_by_len_dissolve = get_severity_index(
+        crash_gdf_adj_crash_by_len_dissolve
+    )
     crash_gdf_adj_crash_by_len_dissolve = crash_gdf_adj_crash_by_len_dissolve.assign(
         crash_rate_per_mile=lambda df: df.total_cnt / df.seg_len_in_interval
     )
@@ -314,6 +316,7 @@ def get_missing_aadt_gdf(aadt_gdf__, aadt_but_no_crash_route_set__):
 
 def get_missing_crash_gdf(crash_gdf__, aadt_but_no_crash_route_set__):
     return crash_gdf__.query("route_gis in @aadt_but_no_crash_route_set__")
+
 
 if __name__ == "__main__":
     path_to_prj_dir = get_project_root()
