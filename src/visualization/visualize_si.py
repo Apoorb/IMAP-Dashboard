@@ -1,3 +1,8 @@
+"""
+Visualize severity index using pdf, cdf, and k-means clustering.
+Created by: Apoorba Bibeka
+"""
+import pandas as pd
 import geopandas as gpd
 import os
 import seaborn as sns
@@ -111,7 +116,10 @@ if __name__ == "__main__":
     path_interim_data = os.path.join(path_to_prj_dir, "data", "interim")
     path_crash_si = os.path.join(path_interim_data, "aadt_crash_ncdot.gpkg")
     path_to_fig = os.path.join(path_to_prj_dir, "reports", "figures")
-
+    path_hpms_2018_nc_fil = os.path.join(
+        path_interim_data, "nhs_hpms_2018_routes.csv"
+    )
+    hpms_2018_nc_fil = pd.read_csv(path_hpms_2018_nc_fil)
     crash_df_fil_si_geom_gdf = gpd.read_file(path_crash_si, driver="gpkg")
     crash_df_fil_si_geom_gdf = crash_df_fil_si_geom_gdf.assign(
         route_class=lambda df: df.route_class.replace(
@@ -133,4 +141,4 @@ if __name__ == "__main__":
         sharex_=False)
 
     apply_kmeans_cluster_plot(crash_df_fil_si_geom_gdf_no_nan)
-    set(crash_df_fil_si_geom_gdf_no_nan.route_no.unique())
+    set(hpms_2018_nc_fil.route_numb) - set(crash_df_fil_si_geom_gdf_no_nan.route_no.unique())
