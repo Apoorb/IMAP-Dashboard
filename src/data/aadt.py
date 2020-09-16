@@ -82,7 +82,7 @@ if __name__ == "__main__":
     aadt_gdf = read_shp(aadt_file)
     test_aadt_df(aadt_gdf)
     aadt_df_fil = fix_aadt_df_type(aadt_gdf)
-    aadt_df_fil = aadt_df_fil.loc[lambda df: ~ df.geometry.isnull()]
+    aadt_df_fil = aadt_df_fil.loc[lambda df: ~df.geometry.isnull()]
     aadt_df_fil_4326 = aadt_df_fil.to_crs(epsg=4326)
 
     out_file_aadt_nc = os.path.join(path_interim_data, "ncdot_2018_aadt.gpkg")
