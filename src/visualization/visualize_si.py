@@ -124,8 +124,7 @@ if __name__ == "__main__":
     crash_df_fil_si_geom_gdf = crash_df_fil_si_geom_gdf.assign(
         route_class=lambda df: df.route_class.replace(
             {1: "Interstate", 2: "US Route", 3: "NC Route", 4:"Secondary Routes"}
-        ).query("route_class in ['Interstate', 'US Route', 'NC Route']'")
-    )
+        )).query("route_class in ['Interstate', 'US Route', 'NC Route']")
     crash_df_fil_si_geom_gdf_no_nan = crash_df_fil_si_geom_gdf.query(
         "~ severity_index.isna()"
     )
