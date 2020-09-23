@@ -82,7 +82,7 @@ if __name__ == "__main__":
     test_aadt_df(aadt_gdf)
     aadt_df_add_col = fix_aadt_df_type(aadt_gdf)
     set(aadt_df_add_col.route_no.unique())
-    max_highway_class = 3
+    max_highway_class = 4
     aadt_df_fil = aadt_df_add_col.loc[lambda df: df.route_class <= max_highway_class]
 
     aadt_df_fil = aadt_df_fil.loc[lambda df: ~df.geometry.isnull()]

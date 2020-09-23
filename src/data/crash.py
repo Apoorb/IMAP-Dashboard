@@ -6,7 +6,7 @@ from src.utils import get_project_root
 from src.data.make_dataset import read_shp
 
 
-def fix_crash_dat_type(crash_df_, max_highway_class=3):
+def fix_crash_dat_type(crash_df_):
     """
 
     Parameters
@@ -18,55 +18,48 @@ def fix_crash_dat_type(crash_df_, max_highway_class=3):
     -------
 
     """
-    crash_df_fil_ = (
-        crash_df_.assign(
-            route_gis=lambda df: df.route_gis.astype(str).str.split(".", expand=True)[
-                0
-            ],
-            route_class=lambda df: df.route_gis.str[0].astype(int),
-            route_qual=lambda df: df.route_gis.str[1].astype(int),
-            route_inventory=lambda df: df.route_gis.str[2].astype(int),
-            route_no=lambda df: df.route_gis.str[3:8].astype(int),
-            route_county=lambda df: df.route_gis.str[8:11].astype(int),
-            st_end_diff=lambda df: df.end_mp_pt - df.st_mp_pt,
-            density_sc=lambda df: pd.to_numeric(df.density_sc, errors="coerce"),
-            severity_s=lambda df: pd.to_numeric(df.severity_s, errors="coerce"),
-            rate_score=lambda df: pd.to_numeric(df.rate_score, errors="coerce"),
-            combined_s=lambda df: pd.to_numeric(df.combined_s, errors="coerce"),
-            ka_cnt=lambda df: pd.to_numeric(df.ka_cnt, errors="coerce"),
-            bc_cnt=lambda df: pd.to_numeric(df.bc_cnt, errors="coerce"),
-            pdo_cnt=lambda df: pd.to_numeric(df.pdo_cnt, errors="coerce"),
-            total_cnt=lambda df: pd.to_numeric(df.total_cnt, errors="coerce"),
-            shape_len_mi=lambda df: pd.to_numeric(df.shape__len, errors="coerce")
-            / 5280,
-        )
-        .filter(
-            items=[
-                "route_gis",
-                "route_class",
-                "route_qual",
-                "route_inventory",
-                "route_no",
-                "route_county",
-                "county",
-                "st_mp_pt",
-                "end_mp_pt",
-                "density_sc",
-                "severity_s",
-                "rate_score",
-                "combined_s",
-                "combined_r",
-                "ka_cnt",
-                "bc_cnt",
-                "pdo_cnt",
-                "total_cnt",
-                "shape_len_mi",
-                "st_end_diff",
-            ]
-        )
-        .loc[lambda df: df.route_class <= max_highway_class]
+    crash_df_add_col_ = crash_df_.assign(
+        route_gis=lambda df: df.route_gis.astype(str).str.split(".", expand=True)[0],
+        route_class=lambda df: df.route_gis.str[0].astype(int),
+        route_qual=lambda df: df.route_gis.str[1].astype(int),
+        route_inventory=lambda df: df.route_gis.str[2].astype(int),
+        route_no=lambda df: df.route_gis.str[3:8].astype(int),
+        route_county=lambda df: df.route_gis.str[8:11].astype(int),
+        st_end_diff=lambda df: df.end_mp_pt - df.st_mp_pt,
+        density_sc=lambda df: pd.to_numeric(df.density_sc, errors="coerce"),
+        severity_s=lambda df: pd.to_numeric(df.severity_s, errors="coerce"),
+        rate_score=lambda df: pd.to_numeric(df.rate_score, errors="coerce"),
+        combined_s=lambda df: pd.to_numeric(df.combined_s, errors="coerce"),
+        ka_cnt=lambda df: pd.to_numeric(df.ka_cnt, errors="coerce"),
+        bc_cnt=lambda df: pd.to_numeric(df.bc_cnt, errors="coerce"),
+        pdo_cnt=lambda df: pd.to_numeric(df.pdo_cnt, errors="coerce"),
+        total_cnt=lambda df: pd.to_numeric(df.total_cnt, errors="coerce"),
+        shape_len_mi=lambda df: pd.to_numeric(df.shape__len, errors="coerce") / 5280,
+    ).filter(
+        items=[
+            "route_gis",
+            "route_class",
+            "route_qual",
+            "route_inventory",
+            "route_no",
+            "route_county",
+            "county",
+            "st_mp_pt",
+            "end_mp_pt",
+            "density_sc",
+            "severity_s",
+            "rate_score",
+            "combined_s",
+            "combined_r",
+            "ka_cnt",
+            "bc_cnt",
+            "pdo_cnt",
+            "total_cnt",
+            "shape_len_mi",
+            "st_end_diff",
+        ]
     )
-    return crash_df_fil_
+    return crash_df_add_col_
 
 
 def test_crash_dat(crash_df_fil_):
@@ -108,8 +101,10 @@ if __name__ == "__main__":
     crash_gdf_geom_4326 = crash_gdf.to_crs(epsg=4326).geometry
     crash_df = pd.DataFrame(crash_gdf.drop(columns="geometry"))
 
-    crash_df_fil = fix_crash_dat_type(crash_df)
-
+    crash_df_add_col = fix_crash_dat_type(crash_df)
+    set(crash_df_add_col.route_no.unique())
+    max_highway_class = 4
+    crash_df_fil = crash_df_add_col.loc[lambda df: df.route_class <= max_highway_class]
     test_crash_dat(crash_df_fil)
 
     crash_df_fil_si = get_severity_index(crash_df_fil)

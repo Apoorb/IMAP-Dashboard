@@ -12,7 +12,7 @@ import numpy as np
 from src.data.crash import get_severity_index
 
 
-def merge_aadt_crash(aadt_gdf_, crash_gdf_, quiet=True):
+def merge_aadt_crash(aadt_gdf_, crash_gdf_, crash_num_years=5, quiet=True):
     """
     Function for merging AADT and Crash data.
     Parameters
@@ -21,6 +21,8 @@ def merge_aadt_crash(aadt_gdf_, crash_gdf_, quiet=True):
         AADT data.
     crash_gdf_: gpd.GeoDataFrame()
         Crash data.
+    crash_num_years : int
+        Number of years for which crash data is reported. Generally it's 5 years.
     quiet: bool
         False, for debug mode.
     Returns
@@ -122,7 +124,8 @@ def merge_aadt_crash(aadt_gdf_, crash_gdf_, quiet=True):
         crash_gdf_adj_crash_by_len_dissolve
     )
     crash_gdf_adj_crash_by_len_dissolve = crash_gdf_adj_crash_by_len_dissolve.assign(
-        crash_rate_per_mile=lambda df: df.total_cnt / df.seg_len_in_interval
+        crash_rate_per_mile_per_year=lambda df: (
+                df.total_cnt / df.seg_len_in_interval / crash_num_years)
     )
     aadt_crash_df_ = (
         aadt_gdf_1.merge(
@@ -154,7 +157,7 @@ def merge_aadt_crash(aadt_gdf_, crash_gdf_, quiet=True):
                 "pdo_cnt",
                 "total_cnt",
                 "severity_index",
-                "crash_rate_per_mile",
+                "crash_rate_per_mile_per_year",
                 "geometry_aadt",
             ]
         )
@@ -355,17 +358,18 @@ if __name__ == "__main__":
     crash_gdf = gpd.read_file(path_crash_si, driver="gpkg")
     aadt_gdf = gpd.read_file(path_aadt_nc, driver="gpkg")
     aadt_gdf = aadt_gdf.query("route_class in [1, 2, 3]")
-    crash_gdf = crash_gdf.query("route_class in [1, 2, 3]")
+    crash_gdf = crash_gdf.query("route_class in [1, 2, 3]").sort_values(
+        ["route_gis", "st_mp_pt"]
+    )
     crash_gdf_95_40 = crash_gdf.query("route_no in [40, 95]")
     aadt_gdf_95_40 = aadt_gdf.query("route_no in [40, 95]")
 
-    aadt_crash_gdf, aadt_but_no_crash_route_set = merge_aadt_crash(
-        aadt_gdf_=aadt_gdf.query("route_id == '20000129020'"), crash_gdf_=crash_gdf, quiet=True
-    )
-
-    aadt_crash_gdf_40_95, aadt_but_no_crash_route_set_40_95 = merge_aadt_crash(
-        aadt_gdf_=aadt_gdf_95_40, crash_gdf_=crash_gdf_95_40, quiet=True
-    )
+    # aadt_crash_gdf_test, aadt_but_no_crash_route_set_test = merge_aadt_crash(
+    #     aadt_gdf_=aadt_gdf.query("route_id == '20000129020'"), crash_gdf_=crash_gdf, quiet=True
+    # )
+    # aadt_crash_gdf_40_95, aadt_but_no_crash_route_set_40_95 = merge_aadt_crash(
+    #     aadt_gdf_=aadt_gdf_95_40, crash_gdf_=crash_gdf_95_40, quiet=True
+    # )
     aadt_crash_gdf, aadt_but_no_crash_route_set = merge_aadt_crash(
         aadt_gdf_=aadt_gdf, crash_gdf_=crash_gdf, quiet=True
     )
@@ -381,4 +385,4 @@ if __name__ == "__main__":
     out_file_aadt_but_no_crash_route_set = os.path.join(
         path_interim_data, "aadt_but_no_crash_route_set.csv"
     )
-    out_file_aadt_but_no_crash_route_set.to_csv(out_file_aadt_but_no_crash_route_set)
+    failed_merge_aadt_dat.to_csv(out_file_aadt_but_no_crash_route_set)

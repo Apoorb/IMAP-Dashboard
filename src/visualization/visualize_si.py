@@ -123,12 +123,15 @@ if __name__ == "__main__":
     crash_df_fil_si_geom_gdf = gpd.read_file(path_crash_si, driver="gpkg")
     crash_df_fil_si_geom_gdf = crash_df_fil_si_geom_gdf.assign(
         route_class=lambda df: df.route_class.replace(
-            {1: "Interstate", 2: "US Route", 3: "NC Route"}
-        )
+            {1: "Interstate", 2: "US Route", 3: "NC Route", 4:"Secondary Routes"}
+        ).query("route_class in ['Interstate', 'US Route', 'NC Route']'")
     )
     crash_df_fil_si_geom_gdf_no_nan = crash_df_fil_si_geom_gdf.query(
         "~ severity_index.isna()"
     )
+    crash_df_fil_si_geom_gdf.groupby("route_class").severity_index.quantile(.95)
+    crash_df_fil_si_geom_gdf.severity_index.quantile(.90)
+
     plot_cdf_pdf(crash_df_fil_si_geom_gdf_no_nan)
     plot_facet_cdf_pdf(crash_df_fil_si_geom_gdf_no_nan)
     plot_facet_cdf_pdf(
@@ -141,4 +144,4 @@ if __name__ == "__main__":
         sharex_=False)
 
     apply_kmeans_cluster_plot(crash_df_fil_si_geom_gdf_no_nan)
-    set(hpms_2018_nc_fil.route_numb) - set(crash_df_fil_si_geom_gdf_no_nan.route_no.unique())
+    set(hpms_2018_nc_fil.route_numb) - set(crash_df_fil_si_geom_gdf.route_no.unique())

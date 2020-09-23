@@ -56,7 +56,9 @@ def test_all_stc_in_study_gdf(
         .drop_duplicates(subset=merge_cols)
         .reset_index(drop=True)
         .assign(
-            route_class=lambda df: df.route_class.replace({1: "I", 2: "US", 3: "NC"}),
+            route_class=lambda df: df.route_class.replace(
+                {1: "I", 2: "US", 3: "NC", 4: "Secondary Routes"}
+            ),
             route_in_study_gdf=True,
         )
     )
@@ -108,13 +110,15 @@ if __name__ == "__main__":
     path_interim_data = os.path.join(path_to_prj_dir, "data", "interim")
     path_crash_si = os.path.join(path_interim_data, "nc_crash_si_2015_2019.gpkg")
     path_aadt_nc = os.path.join(path_interim_data, "ncdot_2018_aadt.gpkg")
-    crash_df_fil_si_geom_gdf = gpd.read_file(path_crash_si, driver="gpkg")
+    path_aadt_crash = os.path.join(path_interim_data, "aadt_crash_ncdot.gpkg")
     path_hpms_2018 = os.path.join(
         path_to_prj_data, "hpms_northcarolina2018", "NorthCarolina_PR_2018.shp"
     )
     hpms_2018_nc = gpd.read_file(path_hpms_2018)
+    crash_df_fil_si_geom_gdf = gpd.read_file(path_crash_si, driver="gpkg")
     aadt_df = gpd.read_file(path_aadt_nc, driver="gpkg")
     stc_df = get_strategic_trans_cor().assign(stc=True)
+    aadt_crash_gdf = gpd.read_file(path_aadt_crash, driver="gpkg")
 
     test_all_stc_in_study_gdf(crash_df_fil_si_geom_gdf, stc_df)
     test_all_stc_in_study_gdf(aadt_df, stc_df)
@@ -150,16 +154,13 @@ if __name__ == "__main__":
     )
     hpms_2018_nc_fil_all.to_file(out_file_hpms_stc, driver="GPKG")
 
-    # Find routes in aadt that are stc.
+    # Find routes in aadt_crash_gdf that are in HPMS NHS.
 
     # Drop route_class for merge for now
-    aadt_df_stc = (
-        aadt_df.replace({"route_class": {1: "I", 2: "US", 3: "NC"}})
-        .merge(stc_df, on=["route_no"], how="left")
-        .assign(stc=lambda df: df.stc.fillna(False))
+    hpms_2018_routes = set(hpms_2018_nc_fil.route_numb)
+    aadt_crash_gdf_nhs = aadt_crash_gdf.query("route_no in @hpms_2018_routes")
+    out_file_aadt_crash_nhs = os.path.join(
+        path_interim_data, "", "aadt_crash_nhs_gis_visual_check_v1.shp"
     )
-    out_file_aadt_stc = os.path.join(
-        path_interim_data, "aadt_stc_gis_visual_check.gpkg"
-    )
-    aadt_df_stc.to_file(out_file_aadt_stc, driver="GPKG")
-    aadt_df_stc.crs
+    aadt_crash_gdf_nhs.to_file(out_file_aadt_crash_nhs)
+    aadt_crash_gdf_nhs.crs
