@@ -7,6 +7,7 @@ import os
 import pandas as pd
 import geopandas as gpd
 from src.utils import get_project_root
+from src.utils import reorder_columns
 import numpy as np
 from src.data.crash import get_severity_index
 
@@ -35,8 +36,7 @@ def merge_aadt_crash(aadt_gdf_, crash_gdf_, quiet=True):
     aadt_grp_keys = aadt_gdf_.groupby(["route_id"]).groups.keys()
 
     aadt_grp_sub_dict = {}
-    crash_grp_sub_st_dict = {}
-    crash_grp_sub_end_dict = {}
+    crash_grp_sub_dict = {}
     aadt_but_no_crash_route_list_ = list()
     for aadt_grp_key in aadt_grp_keys:
         aadt_grp_sub = aadt_grp.get_group(aadt_grp_key).copy()
@@ -45,8 +45,7 @@ def merge_aadt_crash(aadt_gdf_, crash_gdf_, quiet=True):
                 f"Now processing route {aadt_grp_key}; {aadt_grp_sub[['route_class','route_qual', 'route_no', 'route_county']].head(1)}"
             )
         try:
-            crash_grp_sub_st = crash_grp.get_group(aadt_grp_key).copy()
-            crash_grp_sub_end = crash_grp.get_group(aadt_grp_key).copy()
+            crash_grp_sub = crash_grp.get_group(aadt_grp_key).copy()
         except KeyError as err:
             print(f"No Crash data for route {err.args}")
             aadt_but_no_crash_route_list_.append(aadt_grp_key)
@@ -54,41 +53,28 @@ def merge_aadt_crash(aadt_gdf_, crash_gdf_, quiet=True):
 
         # Bin the crash start milepost and end milepost based on AADT.
         aadt_crash_df_bin = bin_aadt_crash(
-            aadt_grp_sub_=aadt_grp_sub,
-            crash_grp_sub_st_=crash_grp_sub_st,
-            crash_grp_sub_end_=crash_grp_sub_end,
+            aadt_grp_sub_=aadt_grp_sub, crash_grp_sub_=crash_grp_sub,
         )
         aadt_grp_sub_dict[aadt_grp_key] = aadt_crash_df_bin["aadt_grp_sub"]
-        crash_grp_sub_st_dict[aadt_grp_key] = aadt_crash_df_bin["crash_grp_sub_st"]
-        crash_grp_sub_end_dict[aadt_grp_key] = aadt_crash_df_bin["crash_grp_sub_end"]
+        crash_grp_sub_dict[aadt_grp_key] = aadt_crash_df_bin[
+            "crash_grp_sub_aadt_interval_long"]
 
     aadt_gdf_1 = pd.concat(aadt_grp_sub_dict.values()).sort_values(
         ["route_id", "st_mp_pt"]
     )
 
     # Subset crash dataset with non-zero rows.
-    crash_grp_sub_st_no_empty_df_set = list(crash_grp_sub_st_dict.values())
-    if min([len(values) for values in crash_grp_sub_st_dict.values()]) == 0:
-        # "No worries at least one crash row present in processed data"
-        crash_grp_sub_st_no_empty_df_set = [
-            value for value in crash_grp_sub_st_dict.values() if len(value) != 0
+    crash_grp_sub_no_empty_df_set = list(crash_grp_sub_dict.values())
+    if min([len(values) for values in crash_grp_sub_dict.values()]) == 0:
+        crash_grp_sub_no_empty_df_set = [
+            value for value in crash_grp_sub_dict.values() if len(value) != 0
         ]
-        for key, value in crash_grp_sub_st_dict.items():
-            if len(value) == 0:
-                aadt_but_no_crash_route_list_.append(key)
 
-    crash_grp_sub_end_no_empty_df_list = list(crash_grp_sub_end_dict.values())
-    if min([len(values) for values in crash_grp_sub_end_dict.values()]) == 0:
-        crash_grp_sub_end_no_empty_df_list = [
-            value for value in crash_grp_sub_end_dict.values() if len(value) != 0
-        ]
-        for key, value in crash_grp_sub_end_dict.items():
-            if len(value) == 0:
-                aadt_but_no_crash_route_list_.append(key)
+    for key, value in crash_grp_sub_dict.items():
+        if len(value) == 0:
+            aadt_but_no_crash_route_list_.append(key)
 
-    crash_gdf_1 = pd.concat(
-        crash_grp_sub_st_no_empty_df_set + crash_grp_sub_end_no_empty_df_list
-    )
+    crash_gdf_1 = pd.concat(crash_grp_sub_no_empty_df_set)
 
     # Subset to relevant columns.
     crash_gdf_no_duplicates = (
@@ -181,7 +167,7 @@ def merge_aadt_crash(aadt_gdf_, crash_gdf_, quiet=True):
     return aadt_crash_gdf_, aadt_but_no_crash_route_set_
 
 
-def bin_aadt_crash(aadt_grp_sub_, crash_grp_sub_st_, crash_grp_sub_end_):
+def bin_aadt_crash(aadt_grp_sub_, crash_grp_sub_):
     """
 
     Parameters
@@ -213,18 +199,60 @@ def bin_aadt_crash(aadt_grp_sub_, crash_grp_sub_st_, crash_grp_sub_end_):
         aadt_grp_sub_.st_mp_pt, aadt_grp_sub_.end_mp_pt_cor, closed="left"
     )
     aadt_grp_sub_.loc[:, "aadt_interval"] = aadt_lrs_bins
-    crash_grp_sub_st_.loc[:, "aadt_interval"] = pd.cut(
-        crash_grp_sub_st_["st_mp_pt"], aadt_lrs_bins
+
+    crash_grp_sub_aadt_interval_ = crash_grp_sub_.copy()
+    crash_grp_sub_aadt_interval_ = (
+        crash_grp_sub_aadt_interval_.assign(
+            crash_interval=lambda df: pd.IntervalIndex.from_arrays(
+                df.st_mp_pt, df.end_mp_pt, closed="left"
+            ),
+            aadt_interval_list=lambda df: df.crash_interval.apply(
+                lambda x: [
+                    interval for interval in aadt_lrs_bins if x.overlaps(interval)
+                ]
+            ),
+        )
+        .drop(columns=["crash_interval"])
+        .sort_values(["route_gis", "st_mp_pt"])
     )
-    crash_grp_sub_end_.loc[:, "aadt_interval"] = pd.cut(
-        crash_grp_sub_end_["end_mp_pt"], aadt_lrs_bins
+
+    crash_grp_sub_aadt_interval_long_= (
+        crash_grp_sub_aadt_interval_.aadt_interval_list
+     .apply(pd.Series)
+     .merge(
+        crash_grp_sub_aadt_interval_[["route_gis", "st_mp_pt", "aadt_interval_list"]],
+        left_index=True,
+        right_index=True)
+     .drop(["aadt_interval_list"], axis=1)
+     .melt(id_vars = ["route_gis", "st_mp_pt"], value_name="aadt_interval")
+     .drop("variable", axis=1)
+     .dropna())
+
+    crash_grp_sub_aadt_interval_long_ = (
+        crash_grp_sub_aadt_interval_.drop(columns = "aadt_interval_list")
+        .merge(
+            crash_grp_sub_aadt_interval_long_,
+            on = ["route_gis", "st_mp_pt"],
+            how = "left"
+        ))
+
+    crash_grp_sub_aadt_interval_long_ = reorder_columns(
+        df=crash_grp_sub_aadt_interval_long_,
+        first_cols=[
+            "route_gis",
+            "route_class",
+            "route_qual",
+            "route_inventory",
+            "route_no",
+            "route_county",
+            "aadt_interval",
+            "st_mp_pt",
+            "end_mp_pt",
+        ],
     )
-    crash_grp_sub_st_ = crash_grp_sub_st_.loc[lambda df: ~df.aadt_interval.isna()]
-    crash_grp_sub_end_ = crash_grp_sub_end_.loc[lambda df: ~df.aadt_interval.isna()]
     return {
         "aadt_grp_sub": aadt_grp_sub_,
-        "crash_grp_sub_st": crash_grp_sub_st_,
-        "crash_grp_sub_end": crash_grp_sub_end_,
+        "crash_grp_sub_aadt_interval_long": crash_grp_sub_aadt_interval_long_,
     }
 
 
@@ -274,7 +302,7 @@ def scale_crash_by_seg_len(crash_gdf_2_):
                 ],
                 [
                     df.st_end_diff - (df.aadt_interval_left - df.st_mp_pt),
-                    df.aadt_interval_left - df.aadt_interval_right,
+                    df.aadt_interval_right - df.aadt_interval_left,
                     df.st_end_diff,
                     df.st_end_diff - (df.end_mp_pt - df.aadt_interval_right),
                 ],
@@ -303,6 +331,7 @@ def scale_crash_by_seg_len(crash_gdf_2_):
                 "aadt_interval_right",
                 "crash_seg_cat",
                 "seg_len_in_interval",
+                "ratio_len_in_interval",
                 "geometry",
             ]
         )
@@ -325,8 +354,14 @@ if __name__ == "__main__":
     path_aadt_nc = os.path.join(path_interim_data, "ncdot_2018_aadt.gpkg")
     crash_gdf = gpd.read_file(path_crash_si, driver="gpkg")
     aadt_gdf = gpd.read_file(path_aadt_nc, driver="gpkg")
+    aadt_gdf = aadt_gdf.query("route_class in [1, 2, 3]")
+    crash_gdf = crash_gdf.query("route_class in [1, 2, 3]")
     crash_gdf_95_40 = crash_gdf.query("route_no in [40, 95]")
     aadt_gdf_95_40 = aadt_gdf.query("route_no in [40, 95]")
+
+    aadt_crash_gdf, aadt_but_no_crash_route_set = merge_aadt_crash(
+        aadt_gdf_=aadt_gdf.query("route_id == '20000129020'"), crash_gdf_=crash_gdf, quiet=True
+    )
 
     aadt_crash_gdf_40_95, aadt_but_no_crash_route_set_40_95 = merge_aadt_crash(
         aadt_gdf_=aadt_gdf_95_40, crash_gdf_=crash_gdf_95_40, quiet=True
@@ -337,5 +372,13 @@ if __name__ == "__main__":
     out_file_aadt_crash = os.path.join(path_interim_data, "aadt_crash_ncdot.gpkg")
     aadt_crash_gdf.to_file(out_file_aadt_crash, driver="GPKG")
 
-    get_missing_aadt_gdf(aadt_gdf, aadt_but_no_crash_route_set)
-    get_missing_crash_gdf(crash_gdf, aadt_but_no_crash_route_set)
+    failed_merge_aadt_dat = get_missing_aadt_gdf(
+        aadt_gdf, aadt_but_no_crash_route_set
+    ).sort_values(["route_id", "st_mp_pt"])
+    failed_merge_crash_dat = get_missing_crash_gdf(
+        crash_gdf, aadt_but_no_crash_route_set
+    ).sort_values(["route_gis", "st_mp_pt"])
+    out_file_aadt_but_no_crash_route_set = os.path.join(
+        path_interim_data, "aadt_but_no_crash_route_set.csv"
+    )
+    out_file_aadt_but_no_crash_route_set.to_csv(out_file_aadt_but_no_crash_route_set)
