@@ -400,19 +400,16 @@ if __name__ == "__main__":
     #     crash_df_=crash_gdf,
     #     quiet=True
     # )
-
     aadt_crash_gdf_test, aadt_but_no_crash_route_set_test = merge_aadt_crash(
         aadt_gdf_=aadt_gdf_95_40,
         crash_gdf_=crash_gdf_95_40,
         quiet=True
     )
-
     aadt_crash_gdf, aadt_but_no_crash_route_set = merge_aadt_crash(
         aadt_gdf_=aadt_gdf,
         crash_gdf_=crash_gdf,
         quiet=True
     )
-
     # Ouput the gpkg file for aadt+crash data.
     # ************************************************************************************
     out_file_aadt_crash = os.path.join(path_interim_data, "aadt_crash_ncdot.gpkg")
