@@ -1,3 +1,6 @@
+"""
+Explore NHS, STC routes. Create shapefiles for visualizing NHS and STC routes.
+"""
 from io import StringIO
 import pandas as pd
 import os
