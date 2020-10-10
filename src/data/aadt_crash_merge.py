@@ -119,8 +119,6 @@ def merge_aadt_crash(aadt_gdf_, crash_gdf_, crash_num_years=5, quiet=True):
             "st_mp_pt": "min",
             "end_mp_pt": "max",
             "st_end_diff": "sum",
-            "aadt_interval_left": "first",
-            "aadt_interval_right": "first",
             "seg_len_in_interval": "sum",
         },
     ).reset_index()
@@ -139,6 +137,8 @@ def merge_aadt_crash(aadt_gdf_, crash_gdf_, crash_num_years=5, quiet=True):
             how="left",
         )
         .assign(
+            aadt_interval_left=lambda df: pd.IntervalIndex(df.aadt_interval).left,
+            aadt_interval_right=lambda df: pd.IntervalIndex(df.aadt_interval).right,
             crash_rate_per_mile_per_year=lambda df: (
                 df.total_cnt / df.seg_len_in_interval / crash_num_years
             ),
@@ -355,8 +355,6 @@ def scale_crash_by_seg_len(crash_gdf_2_):
                 "end_mp_pt",
                 "shape_len_mi",
                 "st_end_diff",
-                "aadt_interval_left",
-                "aadt_interval_right",
                 "crash_seg_cat",
                 "seg_len_in_interval",
                 "ratio_len_in_interval",
@@ -395,11 +393,11 @@ if __name__ == "__main__":
     # Merge aadt and crash data. Fix issues with overlapping intervals.
     # Get a count of missing data.
     # ************************************************************************************
-    # aadt_crash_gdf_test, aadt_but_no_crash_route_set_test = merge_aadt_crash(
-    #     aadt_gdf_=aadt_gdf.query("route_id == '20000129020'"),
-    #     crash_df_=crash_gdf,
-    #     quiet=True
-    # )
+    aadt_crash_gdf_test, aadt_but_no_crash_route_set_test = merge_aadt_crash(
+        aadt_gdf_=aadt_gdf.query("route_id == '10000440092'"),
+        crash_gdf_=crash_gdf,
+        quiet=True
+    )
     aadt_crash_gdf_test, aadt_but_no_crash_route_set_test = merge_aadt_crash(
         aadt_gdf_=aadt_gdf_95_40, crash_gdf_=crash_gdf_95_40, quiet=True
     )
