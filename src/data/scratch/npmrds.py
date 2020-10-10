@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
-import pandas as pd
-import geopandas as gpd
 from src.utils import get_project_root
-from src.data.make_dataset import read_shp
+from src.data.scratch.make_dataset import read_shp
 
 
 def filter_npmrds_columns(npmrds_gdf_):

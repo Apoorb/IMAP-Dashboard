@@ -376,6 +376,9 @@ def get_missing_crash_gdf(crash_gdf__, aadt_but_no_crash_route_set__):
 
 
 if __name__ == "__main__":
+    # Set the paths to relevant files and folders.
+    # Load crash and aadt data.
+    # ************************************************************************************
     path_to_prj_dir = get_project_root()
     path_interim_data = os.path.join(path_to_prj_dir, "data", "interim")
     path_crash_si = os.path.join(path_interim_data, "nc_crash_si_2015_2019.gpkg")
@@ -389,11 +392,15 @@ if __name__ == "__main__":
     crash_gdf_95_40 = crash_gdf.query("route_no in [40, 95]")
     aadt_gdf_95_40 = aadt_gdf.query("route_no in [40, 95]")
 
-    aadt_crash_gdf_test, aadt_but_no_crash_route_set_test = merge_aadt_crash(
-        aadt_gdf_=aadt_gdf.query("route_id == '20000129020'"),
-        crash_gdf_=crash_gdf,
-        quiet=True
-    )
+    # Merge aadt and crash data. Fix issues with overlapping intervals.
+    # Get a count of missing data.
+    # ************************************************************************************
+    # aadt_crash_gdf_test, aadt_but_no_crash_route_set_test = merge_aadt_crash(
+    #     aadt_gdf_=aadt_gdf.query("route_id == '20000129020'"),
+    #     crash_df_=crash_gdf,
+    #     quiet=True
+    # )
+
     aadt_crash_gdf_test, aadt_but_no_crash_route_set_test = merge_aadt_crash(
         aadt_gdf_=aadt_gdf_95_40,
         crash_gdf_=crash_gdf_95_40,
@@ -405,9 +412,14 @@ if __name__ == "__main__":
         crash_gdf_=crash_gdf,
         quiet=True
     )
+
+    # Ouput the gpkg file for aadt+crash data.
+    # ************************************************************************************
     out_file_aadt_crash = os.path.join(path_interim_data, "aadt_crash_ncdot.gpkg")
     aadt_crash_gdf.to_file(out_file_aadt_crash, driver="GPKG")
 
+    # Ouput the file showing routes with AADT but no crash data.
+    # ************************************************************************************
     failed_merge_aadt_dat = get_missing_aadt_gdf(
         aadt_gdf, aadt_but_no_crash_route_set
     ).sort_values(["route_id", "st_mp_pt"])

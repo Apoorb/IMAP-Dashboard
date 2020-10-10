@@ -10,8 +10,7 @@ from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 import matplotlib.ticker as plticker
 from src.utils import get_project_root
-import sklearn
-import numpy as np
+
 
 plt.rcParams.update({'font.size': 14})
 
@@ -124,7 +123,7 @@ def apply_kmeans_cluster_plot(crash_df_fil_si_geom_gdf_no_nan_):
 if __name__ == "__main__":
     path_to_prj_dir = get_project_root()
     path_interim_data = os.path.join(path_to_prj_dir, "data", "interim")
-    path_processed_data =os.path.join(path_to_prj_dir, "data", "processed")
+    path_processed_data = os.path.join(path_to_prj_dir, "data", "processed")
     path_crash_si = os.path.join(path_interim_data, "aadt_crash_ncdot.gpkg")
     path_to_fig = os.path.join(path_to_prj_dir, "reports", "figures")
     path_hpms_2018_nc_fil = os.path.join(
@@ -159,27 +158,3 @@ if __name__ == "__main__":
 
     apply_kmeans_cluster_plot(crash_df_fil_si_geom_gdf_no_nan)
     set(hpms_2018_nc_fil.route_numb) - set(crash_df_fil_si_geom_gdf.route_no.unique())
-
-    crash_df_fil_si_geom_gdf_no_nan_scaled_si = crash_df_fil_si_geom_gdf_no_nan.assign(
-        severity_index_need_scaling=lambda df: np.select(
-            [df.severity_index<=quantile_90th,
-             df.severity_index>quantile_90th],
-            [True, False]
-        ),
-        severity_index_scaled = lambda df: (
-            df.groupby("severity_index_need_scaling")
-                .severity_index
-                .transform(lambda x: sklearn.preprocessing.minmax_scale(x,
-                                                                        (1,1.2)))),
-        )
-    crash_df_fil_si_geom_gdf_no_nan_scaled_si.loc[
-        lambda x: ~ x.severity_index_need_scaling.astype(bool),
-        "severity_index_scaled"
-        ] = 1.2
-
-    path_si_scaled_shp_dir = os.path.join(path_processed_data, "si_scaled")
-    if not os.path.isdir(path_si_scaled_shp_dir):
-        os.mkdir(path_si_scaled_shp_dir)
-    path_si_scaled_shp = os.path.join(path_si_scaled_shp_dir, "si_scaled.shp")
-
-    crash_df_fil_si_geom_gdf_no_nan_scaled_si.to_file(path_si_scaled_shp)
