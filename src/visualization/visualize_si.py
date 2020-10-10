@@ -10,6 +10,10 @@ from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 import matplotlib.ticker as plticker
 from src.utils import get_project_root
+import sklearn
+import numpy as np
+
+plt.rcParams.update({'font.size': 14})
 
 sns.set_style("whitegrid")
 LOC_Y = plticker.MultipleLocator(
@@ -21,6 +25,7 @@ LOC_X = plticker.MultipleLocator(
 
 
 def plot_cdf_pdf(crash_df_fil_si_geom_gdf_no_nan_,
+                 quantile_90th_,
                  loc_x=LOC_X,
                  loc_y=LOC_Y,
                  title_="2015-2019 Severity Index CDF",
@@ -39,7 +44,11 @@ def plot_cdf_pdf(crash_df_fil_si_geom_gdf_no_nan_,
         si_cdf_plot.xaxis.set_major_locator(loc_x)
     if bool(loc_y):
         si_cdf_plot.yaxis.set_major_locator(loc_y)
+    plt.axvline(quantile_90th_, color='red')
+    plt.text(quantile_90th_-10, 0.90, r"$90^{th}$"+"\nPercentile\n= 8.62%", fontsize=10)
     si_cdf_plot_fig = si_cdf_plot.get_figure()
+    plt.tight_layout()
+    si_cdf_plot_fig.set_size_inches(6, 4)
     si_cdf_plot_fig.savefig(
         fname=os.path.join(path_to_fig, f"{img_file_}.png")
     )
@@ -70,6 +79,7 @@ def plot_facet_cdf_pdf(crash_df_fil_si_geom_gdf_no_nan_,
     plt.subplots_adjust(top=0.85)
     si_cdf_plot_rt_cls.fig.suptitle(title_)
     si_cdf_plot_rt_cls.set_xlabels("Severity Index")
+    plt.tight_layout()
     si_cdf_plot_rt_cls.savefig(
         fname=os.path.join(path_to_fig, f"{img_file_}.png")
     )
@@ -114,6 +124,7 @@ def apply_kmeans_cluster_plot(crash_df_fil_si_geom_gdf_no_nan_):
 if __name__ == "__main__":
     path_to_prj_dir = get_project_root()
     path_interim_data = os.path.join(path_to_prj_dir, "data", "interim")
+    path_processed_data =os.path.join(path_to_prj_dir, "data", "processed")
     path_crash_si = os.path.join(path_interim_data, "aadt_crash_ncdot.gpkg")
     path_to_fig = os.path.join(path_to_prj_dir, "reports", "figures")
     path_hpms_2018_nc_fil = os.path.join(
@@ -129,9 +140,13 @@ if __name__ == "__main__":
         "~ severity_index.isna()"
     )
     crash_df_fil_si_geom_gdf.groupby("route_class").severity_index.quantile(.95)
-    crash_df_fil_si_geom_gdf.severity_index.quantile(.90)
+    crash_df_fil_si_geom_gdf_no_nan.severity_index.describe()
+    quantile_90th = crash_df_fil_si_geom_gdf.severity_index.quantile(.90)
+    plot_cdf_pdf(crash_df_fil_si_geom_gdf_no_nan,
+                 quantile_90th_=quantile_90th)
 
-    plot_cdf_pdf(crash_df_fil_si_geom_gdf_no_nan)
+    plt.rcParams.update({'font.size': 14,
+                         'xtick.labelsize':10})
     plot_facet_cdf_pdf(crash_df_fil_si_geom_gdf_no_nan)
     plot_facet_cdf_pdf(
         crash_df_fil_si_geom_gdf_no_nan_=crash_df_fil_si_geom_gdf_no_nan,
@@ -144,3 +159,27 @@ if __name__ == "__main__":
 
     apply_kmeans_cluster_plot(crash_df_fil_si_geom_gdf_no_nan)
     set(hpms_2018_nc_fil.route_numb) - set(crash_df_fil_si_geom_gdf.route_no.unique())
+
+    crash_df_fil_si_geom_gdf_no_nan_scaled_si = crash_df_fil_si_geom_gdf_no_nan.assign(
+        severity_index_need_scaling=lambda df: np.select(
+            [df.severity_index<=quantile_90th,
+             df.severity_index>quantile_90th],
+            [True, False]
+        ),
+        severity_index_scaled = lambda df: (
+            df.groupby("severity_index_need_scaling")
+                .severity_index
+                .transform(lambda x: sklearn.preprocessing.minmax_scale(x,
+                                                                        (1,1.2)))),
+        )
+    crash_df_fil_si_geom_gdf_no_nan_scaled_si.loc[
+        lambda x: ~ x.severity_index_need_scaling.astype(bool),
+        "severity_index_scaled"
+        ] = 1.2
+
+    path_si_scaled_shp_dir = os.path.join(path_processed_data, "si_scaled")
+    if not os.path.isdir(path_si_scaled_shp_dir):
+        os.mkdir(path_si_scaled_shp_dir)
+    path_si_scaled_shp = os.path.join(path_si_scaled_shp_dir, "si_scaled.shp")
+
+    crash_df_fil_si_geom_gdf_no_nan_scaled_si.to_file(path_si_scaled_shp)
