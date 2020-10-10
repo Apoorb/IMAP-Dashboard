@@ -40,6 +40,9 @@ def merge_aadt_crash(aadt_gdf_, crash_gdf_, crash_num_years=5, quiet=True):
     aadt_grp_sub_dict = {}
     crash_grp_sub_dict = {}
     aadt_but_no_crash_route_list_ = list()
+    # Loop over aadt and crash data for a particular route and county and create a
+    # crosswalk in the crash data that allows us to merge it to the AADT data using
+    # the LRS (linear referencing system).
     for aadt_grp_key in aadt_grp_keys:
         aadt_grp_sub = aadt_grp.get_group(aadt_grp_key).copy()
         if not quiet:
@@ -72,6 +75,7 @@ def merge_aadt_crash(aadt_gdf_, crash_gdf_, crash_num_years=5, quiet=True):
             value for value in crash_grp_sub_dict.values() if len(value) != 0
         ]
 
+    # Get a list of routes with missing crash data.
     for key, value in crash_grp_sub_dict.items():
         if len(value) == 0:
             aadt_but_no_crash_route_list_.append(key)
@@ -99,8 +103,7 @@ def merge_aadt_crash(aadt_gdf_, crash_gdf_, crash_num_years=5, quiet=True):
         .drop_duplicates(["route_gis", "aadt_interval", "st_mp_pt"])
         .sort_values(["route_gis", "st_mp_pt"])
     )
-
-    # Change the crash freqency in a segment based on the AADT interval length and
+    # Change the crash frequency in a segment based on the AADT interval length and
     # position. Consider crashes to be uniform distributed along the length.
     crash_gdf_adj_crash_by_len = scale_crash_by_seg_len(crash_gdf_no_duplicates)
     # Aggregate crash fields based on AADT intervals.
@@ -120,13 +123,12 @@ def merge_aadt_crash(aadt_gdf_, crash_gdf_, crash_num_years=5, quiet=True):
             "seg_len_in_interval": "sum",
         },
     ).reset_index()
+    # Compute severity index on the new crash data boundaries correponding to the AADT
+    # data boundaries.
     crash_gdf_adj_crash_by_len_dissolve = get_severity_index(
         crash_gdf_adj_crash_by_len_dissolve
     )
-    crash_gdf_adj_crash_by_len_dissolve = crash_gdf_adj_crash_by_len_dissolve.assign(
-        crash_rate_per_mile_per_year=lambda df: (
-                df.total_cnt / df.seg_len_in_interval / crash_num_years)
-    )
+    # Merge the crash data to AADT data and compute IF and severity index factor.
     aadt_crash_df_ = (
         aadt_gdf_1.merge(
             crash_gdf_adj_crash_by_len_dissolve,
@@ -134,6 +136,11 @@ def merge_aadt_crash(aadt_gdf_, crash_gdf_, crash_num_years=5, quiet=True):
             right_on=["route_gis", "aadt_interval"],
             suffixes=["_aadt", "_crash"],
             how="left",
+        )
+        .assign(
+            crash_rate_per_mile_per_year=lambda df: (
+                    df.total_cnt / df.seg_len_in_interval / crash_num_years),
+            inc_fac=lambda df: df.crash_rate_per_mile_per_year * df.aadt_2018 / 100000,
         )
         .filter(
             items=[
@@ -156,6 +163,7 @@ def merge_aadt_crash(aadt_gdf_, crash_gdf_, crash_num_years=5, quiet=True):
                 "bc_cnt",
                 "pdo_cnt",
                 "total_cnt",
+                "inc_fac",
                 "severity_index",
                 "crash_rate_per_mile_per_year",
                 "geometry_aadt",
@@ -172,18 +180,31 @@ def merge_aadt_crash(aadt_gdf_, crash_gdf_, crash_num_years=5, quiet=True):
 
 def bin_aadt_crash(aadt_grp_sub_, crash_grp_sub_):
     """
-
+    Function to bin AADT data and create a crosswalk between the AADT data spatial
+    boundaries and crash data spatial boundaries.
     Parameters
     ----------
-    aadt_grp_sub_
-    crash_grp_sub_st_
-    crash_grp_sub_end_
-
+    aadt_grp_sub_: gpd.GeoDataFrame()
+        AADT data for one route in one county.
+    crash_grp_sub_
+        Crash data for the aadt_grp_sub_ data route and county.
     Returns
     -------
-
+    {
+        "aadt_grp_sub": aadt_grp_sub_,
+        "crash_grp_sub_aadt_interval_long": crash_grp_sub_aadt_interval_long_,
+    } : dict
+        AADT data for one route in one county with corrected interval boundaries and a
+        column for defining interval.
+        Crash data with a crosswalk between the crash data spatial boundaries and AADT
+        data spatial boundaries.
     """
-    # Create bins for grouping the data
+    # Create bins for grouping the data.
+    # Find if the aadt data has intervals that overlap with each other. Remove the overlap
+    # by looking at the end point of 1st and start point of 2nd interval. If the end point
+    # of 1st interval is after the start point of 2nd interval, use the start point of
+    # 2nd interval as the end point of 1st interval.
+    # Recompute interval length with corrected interval boundaries.
     aadt_grp_sub_ = aadt_grp_sub_.sort_values(["st_mp_pt"]).assign(
         st_mp_pt_shift1=lambda df: df.st_mp_pt.shift(-1).fillna(df.end_mp_pt),
         overlapping_interval=lambda df: (df.st_mp_pt_shift1 - df.end_mp_pt).lt(0),
@@ -198,11 +219,13 @@ def bin_aadt_crash(aadt_grp_sub_, crash_grp_sub_):
             f"{aadt_grp_sub_.loc[aadt_grp_sub_.overlapping_interval, ['st_mp_pt', 'end_mp_pt', 'st_mp_pt_shift1', 'end_mp_pt_cor']]}"
         )
 
+    # Create interval index from aadt data that would be used to cut the crash data.
     aadt_lrs_bins = pd.IntervalIndex.from_arrays(
         aadt_grp_sub_.st_mp_pt, aadt_grp_sub_.end_mp_pt_cor, closed="left"
     )
     aadt_grp_sub_.loc[:, "aadt_interval"] = aadt_lrs_bins
 
+    # Find overlaping intervals between the crash and aadt data.
     crash_grp_sub_aadt_interval_ = crash_grp_sub_.copy()
     crash_grp_sub_aadt_interval_ = (
         crash_grp_sub_aadt_interval_.assign(
@@ -218,27 +241,29 @@ def bin_aadt_crash(aadt_grp_sub_, crash_grp_sub_):
         .drop(columns=["crash_interval"])
         .sort_values(["route_gis", "st_mp_pt"])
     )
-
-    crash_grp_sub_aadt_interval_long_= (
-        crash_grp_sub_aadt_interval_.aadt_interval_list
-     .apply(pd.Series)
-     .merge(
-        crash_grp_sub_aadt_interval_[["route_gis", "st_mp_pt", "aadt_interval_list"]],
-        left_index=True,
-        right_index=True)
-     .drop(["aadt_interval_list"], axis=1)
-     .melt(id_vars = ["route_gis", "st_mp_pt"], value_name="aadt_interval")
-     .drop("variable", axis=1)
-     .dropna())
-
+    # Convert the list of overlapping crash data intervals into new rows.
     crash_grp_sub_aadt_interval_long_ = (
-        crash_grp_sub_aadt_interval_.drop(columns = "aadt_interval_list")
+        crash_grp_sub_aadt_interval_.aadt_interval_list
+        .apply(pd.Series)
+        .merge(
+            crash_grp_sub_aadt_interval_[["route_gis", "st_mp_pt", "aadt_interval_list"]],
+            left_index=True,
+            right_index=True
+        )
+        .drop(["aadt_interval_list"], axis=1)
+        .melt(id_vars=["route_gis", "st_mp_pt"], value_name="aadt_interval")
+        .drop("variable", axis=1)
+        .dropna())
+    # Add the orignal set of columns to the crash_grp_sub_aadt_interval_long_.
+    # Need to do a left merge so the new DataFrame is a GeoDataFrame.
+    crash_grp_sub_aadt_interval_long_ = (
+        crash_grp_sub_aadt_interval_.drop(columns="aadt_interval_list")
         .merge(
             crash_grp_sub_aadt_interval_long_,
-            on = ["route_gis", "st_mp_pt"],
-            how = "left"
+            on=["route_gis", "st_mp_pt"],
+            how="left"
         ))
-
+    # Reorder the data new crash GeoDataFrame.
     crash_grp_sub_aadt_interval_long_ = reorder_columns(
         df=crash_grp_sub_aadt_interval_long_,
         first_cols=[
@@ -364,14 +389,21 @@ if __name__ == "__main__":
     crash_gdf_95_40 = crash_gdf.query("route_no in [40, 95]")
     aadt_gdf_95_40 = aadt_gdf.query("route_no in [40, 95]")
 
-    # aadt_crash_gdf_test, aadt_but_no_crash_route_set_test = merge_aadt_crash(
-    #     aadt_gdf_=aadt_gdf.query("route_id == '20000129020'"), crash_gdf_=crash_gdf, quiet=True
-    # )
-    # aadt_crash_gdf_40_95, aadt_but_no_crash_route_set_40_95 = merge_aadt_crash(
-    #     aadt_gdf_=aadt_gdf_95_40, crash_gdf_=crash_gdf_95_40, quiet=True
-    # )
+    aadt_crash_gdf_test, aadt_but_no_crash_route_set_test = merge_aadt_crash(
+        aadt_gdf_=aadt_gdf.query("route_id == '20000129020'"),
+        crash_gdf_=crash_gdf,
+        quiet=True
+    )
+    aadt_crash_gdf_test, aadt_but_no_crash_route_set_test = merge_aadt_crash(
+        aadt_gdf_=aadt_gdf_95_40,
+        crash_gdf_=crash_gdf_95_40,
+        quiet=True
+    )
+
     aadt_crash_gdf, aadt_but_no_crash_route_set = merge_aadt_crash(
-        aadt_gdf_=aadt_gdf, crash_gdf_=crash_gdf, quiet=True
+        aadt_gdf_=aadt_gdf,
+        crash_gdf_=crash_gdf,
+        quiet=True
     )
     out_file_aadt_crash = os.path.join(path_interim_data, "aadt_crash_ncdot.gpkg")
     aadt_crash_gdf.to_file(out_file_aadt_crash, driver="GPKG")
