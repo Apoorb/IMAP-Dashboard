@@ -163,8 +163,7 @@ if __name__ == "__main__":
     # Find routes in hpms nhs and not in stc
     # ************************************************************************************
     hpms_2018_nc_fil = routes_in_hpms_2018_nhs(
-        hpms_2018_nc_=hpms_2018_nc,
-        stc_df_=stc_df
+        hpms_2018_nc_=hpms_2018_nc, stc_df_=stc_df
     )
     # Output routes in hpms nhs and not in stc
     # ************************************************************************************

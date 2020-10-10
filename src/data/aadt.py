@@ -69,8 +69,8 @@ def test_aadt_df(aadt_gdf_):
         or "aadt_2018"
     """
     assert (
-            aadt_gdf_[["route_id", "begin_mp", "end_mp", "aadt_2018"]].isna().sum().sum()
-            == 0
+        aadt_gdf_[["route_id", "begin_mp", "end_mp", "aadt_2018"]].isna().sum().sum()
+        == 0
     ), (
         'Need to remove rows with missing "route_id", "begin_mp", "end_mp", or '
         '"aadt_2018"'

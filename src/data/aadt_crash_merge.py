@@ -62,7 +62,8 @@ def merge_aadt_crash(aadt_gdf_, crash_gdf_, crash_num_years=5, quiet=True):
         )
         aadt_grp_sub_dict[aadt_grp_key] = aadt_crash_df_bin["aadt_grp_sub"]
         crash_grp_sub_dict[aadt_grp_key] = aadt_crash_df_bin[
-            "crash_grp_sub_aadt_interval_long"]
+            "crash_grp_sub_aadt_interval_long"
+        ]
 
     aadt_gdf_1 = pd.concat(aadt_grp_sub_dict.values()).sort_values(
         ["route_id", "st_mp_pt"]
@@ -139,7 +140,8 @@ def merge_aadt_crash(aadt_gdf_, crash_gdf_, crash_num_years=5, quiet=True):
         )
         .assign(
             crash_rate_per_mile_per_year=lambda df: (
-                    df.total_cnt / df.seg_len_in_interval / crash_num_years),
+                df.total_cnt / df.seg_len_in_interval / crash_num_years
+            ),
             inc_fac=lambda df: df.crash_rate_per_mile_per_year * df.aadt_2018 / 100000,
         )
         .filter(
@@ -243,26 +245,24 @@ def bin_aadt_crash(aadt_grp_sub_, crash_grp_sub_):
     )
     # Convert the list of overlapping crash data intervals into new rows.
     crash_grp_sub_aadt_interval_long_ = (
-        crash_grp_sub_aadt_interval_.aadt_interval_list
-        .apply(pd.Series)
+        crash_grp_sub_aadt_interval_.aadt_interval_list.apply(pd.Series)
         .merge(
-            crash_grp_sub_aadt_interval_[["route_gis", "st_mp_pt", "aadt_interval_list"]],
+            crash_grp_sub_aadt_interval_[
+                ["route_gis", "st_mp_pt", "aadt_interval_list"]
+            ],
             left_index=True,
-            right_index=True
+            right_index=True,
         )
         .drop(["aadt_interval_list"], axis=1)
         .melt(id_vars=["route_gis", "st_mp_pt"], value_name="aadt_interval")
         .drop("variable", axis=1)
-        .dropna())
+        .dropna()
+    )
     # Add the orignal set of columns to the crash_grp_sub_aadt_interval_long_.
     # Need to do a left merge so the new DataFrame is a GeoDataFrame.
-    crash_grp_sub_aadt_interval_long_ = (
-        crash_grp_sub_aadt_interval_.drop(columns="aadt_interval_list")
-        .merge(
-            crash_grp_sub_aadt_interval_long_,
-            on=["route_gis", "st_mp_pt"],
-            how="left"
-        ))
+    crash_grp_sub_aadt_interval_long_ = crash_grp_sub_aadt_interval_.drop(
+        columns="aadt_interval_list"
+    ).merge(crash_grp_sub_aadt_interval_long_, on=["route_gis", "st_mp_pt"], how="left")
     # Reorder the data new crash GeoDataFrame.
     crash_grp_sub_aadt_interval_long_ = reorder_columns(
         df=crash_grp_sub_aadt_interval_long_,
@@ -401,14 +401,10 @@ if __name__ == "__main__":
     #     quiet=True
     # )
     aadt_crash_gdf_test, aadt_but_no_crash_route_set_test = merge_aadt_crash(
-        aadt_gdf_=aadt_gdf_95_40,
-        crash_gdf_=crash_gdf_95_40,
-        quiet=True
+        aadt_gdf_=aadt_gdf_95_40, crash_gdf_=crash_gdf_95_40, quiet=True
     )
     aadt_crash_gdf, aadt_but_no_crash_route_set = merge_aadt_crash(
-        aadt_gdf_=aadt_gdf,
-        crash_gdf_=crash_gdf,
-        quiet=True
+        aadt_gdf_=aadt_gdf, crash_gdf_=crash_gdf, quiet=True
     )
     # Ouput the gpkg file for aadt+crash data.
     # ************************************************************************************
