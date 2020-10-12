@@ -8,29 +8,36 @@ import os
 from src.utils import get_project_root
 import sklearn
 import numpy as np
-
+from sklearn.preprocessing import minmax_scale
 
 if __name__ == "__main__":
+    # Set the paths to relevant files and folders.
+    # Load crash and aadt data.
+    # ************************************************************************************
     path_to_prj_dir = get_project_root()
     path_interim_data = os.path.join(path_to_prj_dir, "data", "interim")
     path_processed_data = os.path.join(path_to_prj_dir, "data", "processed")
-    path_crash_si = os.path.join(path_interim_data, "aadt_crash_ncdot.gpkg")
-    path_to_fig = os.path.join(path_to_prj_dir, "reports", "figures")
-    path_hpms_2018_nc_fil = os.path.join(
-        path_interim_data, "nhs_hpms_2018_routes.csv"
+    path_aadt_crash_si = os.path.join(path_interim_data, "aadt_crash_ncdot.gpkg")
+    path_aadt_but_no_crash_route_set = os.path.join(
+        path_interim_data, "aadt_but_no_crash_route_set.csv"
     )
-    hpms_2018_nc_fil = pd.read_csv(path_hpms_2018_nc_fil)
-    crash_df_fil_si_geom_gdf = gpd.read_file(path_crash_si, driver="gpkg")
-    crash_df_fil_si_geom_gdf = crash_df_fil_si_geom_gdf.assign(
+    path_to_fig = os.path.join(path_to_prj_dir, "reports", "figures")
+    crash_aadt_fil_si_geom_gdf = gpd.read_file(path_aadt_crash_si, driver="gpkg")
+    crash_aadt_fil_si_geom_gdf = crash_aadt_fil_si_geom_gdf.assign(
         route_class=lambda df: df.route_class.replace(
             {1: "Interstate", 2: "US Route", 3: "NC Route", 4: "Secondary Routes"}
         )).query("route_class in ['Interstate', 'US Route', 'NC Route']")
-    crash_df_fil_si_geom_gdf_no_nan = crash_df_fil_si_geom_gdf.query(
+
+    crash_df_fil_si_geom_gdf_nan = crash_aadt_fil_si_geom_gdf.query(
+        " severity_index.isna()"
+    )
+    crash_df_fil_si_geom_gdf_no_nan = crash_aadt_fil_si_geom_gdf.query(
         "~ severity_index.isna()"
     )
-    crash_df_fil_si_geom_gdf.groupby("route_class").severity_index.quantile(.95)
+
+    crash_aadt_fil_si_geom_gdf.groupby("route_class").severity_index.quantile(.95)
     crash_df_fil_si_geom_gdf_no_nan.severity_index.describe()
-    quantile_90th = crash_df_fil_si_geom_gdf.severity_index.quantile(.90)
+    quantile_90th = crash_aadt_fil_si_geom_gdf.severity_index.quantile(.90)
 
     crash_df_fil_si_geom_gdf_no_nan_scaled_si = crash_df_fil_si_geom_gdf_no_nan.assign(
         severity_index_need_scaling=lambda df: np.select(
@@ -41,11 +48,7 @@ if __name__ == "__main__":
         severity_index_scaled=lambda df: (
             df.groupby("severity_index_need_scaling")
             .severity_index
-            .transform(lambda x: sklearn.preprocessing.minmax_scale(x,
-                                                                    (1, 1.2)
-                                                                    )
-                       )
-        ),
+            .transform(lambda x: minmax_scale(x, (1, 1.2)))),
     )
     crash_df_fil_si_geom_gdf_no_nan_scaled_si.loc[
         lambda x: ~ x.severity_index_need_scaling.astype(bool),
@@ -58,3 +61,10 @@ if __name__ == "__main__":
     path_si_scaled_shp = os.path.join(path_si_scaled_shp_dir, "si_scaled.shp")
 
     crash_df_fil_si_geom_gdf_no_nan_scaled_si.to_file(path_si_scaled_shp)
+
+
+    path_missing_crash = os.path.join(path_processed_data, "missing_crashes")
+    if not os.path.isdir(path_missing_crash):
+        os.mkdir(path_missing_crash)
+    path_missing_crash_shp = os.path.join(path_missing_crash, "missing_crash.shp")
+    crash_df_fil_si_geom_gdf_nan.to_file(path_missing_crash_shp)

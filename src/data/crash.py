@@ -8,7 +8,7 @@ import os
 import pandas as pd
 import geopandas as gpd
 from src.utils import get_project_root
-from src.data.scratch.make_dataset import read_shp
+from src.data.make_dataset import read_shp
 
 
 def fix_crash_dat_type(crash_df_):
@@ -106,6 +106,8 @@ def get_severity_index(
         )
         / df.total_cnt
     )
+    crash_df_fil_si_.loc[lambda df: df.total_cnt == 0, "severity_index"] = 1
+
     return crash_df_fil_si_
 
 

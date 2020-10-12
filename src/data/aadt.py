@@ -7,7 +7,7 @@ Created by: Apoorba Bibeka
 import os
 import pandas as pd
 from src.utils import get_project_root
-from src.data.scratch.make_dataset import read_shp
+from src.data.make_dataset import read_shp
 
 
 def add_aadt_new_cols_fix_dtypes(aadt_gdf_):

@@ -45,6 +45,9 @@ def merge_aadt_crash(aadt_gdf_, crash_gdf_, crash_num_years=5, quiet=True):
     # the LRS (linear referencing system).
     for aadt_grp_key in aadt_grp_keys:
         aadt_grp_sub = aadt_grp.get_group(aadt_grp_key).copy()
+        # Bin the crash start milepost and end milepost based on AADT.
+        aadt_bin_df_dict = get_aadt_bin(aadt_grp_sub_=aadt_grp_sub)
+        aadt_grp_sub_dict[aadt_grp_key] = aadt_bin_df_dict["aadt_grp_sub_1"]
         if not quiet:
             print(
                 f"Now processing route {aadt_grp_key}; {aadt_grp_sub[['route_class','route_qual', 'route_no', 'route_county']].head(1)}"
@@ -54,32 +57,82 @@ def merge_aadt_crash(aadt_gdf_, crash_gdf_, crash_num_years=5, quiet=True):
         except KeyError as err:
             print(f"No Crash data for route {err.args}")
             aadt_but_no_crash_route_list_.append(aadt_grp_key)
-            continue
-
-        # Bin the crash start milepost and end milepost based on AADT.
-        aadt_crash_df_bin = bin_aadt_crash(
-            aadt_grp_sub_=aadt_grp_sub, crash_grp_sub_=crash_grp_sub,
-        )
-        aadt_grp_sub_dict[aadt_grp_key] = aadt_crash_df_bin["aadt_grp_sub"]
-        crash_grp_sub_dict[aadt_grp_key] = aadt_crash_df_bin[
-            "crash_grp_sub_aadt_interval_long"
-        ]
-
+            #continue
+        else:
+            crash_grp_sub_dict[aadt_grp_key] = bin_aadt_crash(
+                aadt_lrs_bins=aadt_bin_df_dict["aadt_lrs_bins"],
+                crash_grp_sub_=crash_grp_sub
+            )
     aadt_gdf_1 = pd.concat(aadt_grp_sub_dict.values()).sort_values(
         ["route_id", "st_mp_pt"]
     )
 
     # Subset crash dataset with non-zero rows.
     crash_grp_sub_no_empty_df_set = list(crash_grp_sub_dict.values())
-    if min([len(values) for values in crash_grp_sub_dict.values()]) == 0:
-        crash_grp_sub_no_empty_df_set = [
-            value for value in crash_grp_sub_dict.values() if len(value) != 0
-        ]
+    if len(crash_grp_sub_no_empty_df_set) != 0:
+        if min([len(values) for values in crash_grp_sub_dict.values()]) == 0:
+            crash_grp_sub_no_empty_df_set = [
+                value for value in crash_grp_sub_dict.values() if len(value) != 0
+            ]
 
     # Get a list of routes with missing crash data.
     for key, value in crash_grp_sub_dict.items():
         if len(value) == 0:
             aadt_but_no_crash_route_list_.append(key)
+    aadt_but_no_crash_route_set_ = set(aadt_but_no_crash_route_list_)
+
+    if len(crash_grp_sub_no_empty_df_set) == 0:
+        aadt_crash_df_ = (
+            aadt_gdf_1
+            .assign(
+                aadt_interval_left=lambda df: pd.IntervalIndex(df.aadt_interval).left,
+                aadt_interval_right=lambda df: pd.IntervalIndex(df.aadt_interval).right,
+                st_end_diff_aadt=lambda df: df.st_end_diff,
+                st_mp_pt_crash=np.nan,
+                end_mp_pt_crash=np.nan,
+                st_end_diff_crash=np.nan,
+                seg_len_in_interval=np.nan,
+                ka_cnt=np.nan,
+                bc_cnt=np.nan,
+                pdo_cnt=np.nan,
+                total_cnt=np.nan,
+                inc_fac=np.nan,
+                severity_index=np.nan,
+                crash_rate_per_mile_per_year=np.nan,
+                geometry_aadt=lambda df : df.geometry
+            )
+            .filter(
+                items=[
+                    "route_id",
+                    "route_class",
+                    "route_qual",
+                    "route_inventory",
+                    "route_county",
+                    "route_no",
+                    "st_mp_pt_crash",
+                    "end_mp_pt_crash",
+                    "st_end_diff_crash",
+                    "aadt_interval_left",
+                    "aadt_interval_right",
+                    "st_end_diff_aadt",
+                    "seg_len_in_interval",
+                    "aadt_2018",
+                    "source",
+                    "ka_cnt",
+                    "bc_cnt",
+                    "pdo_cnt",
+                    "total_cnt",
+                    "inc_fac",
+                    "severity_index",
+                    "crash_rate_per_mile_per_year",
+                    "geometry_aadt",
+                ]
+            )
+            .sort_values(["route_id", "aadt_interval_left"])
+        )
+        aadt_crash_gdf_ = gpd.GeoDataFrame(aadt_crash_df_, geometry="geometry_aadt")
+        aadt_crash_gdf_.crs = "EPSG:4326"
+        return aadt_crash_gdf_, aadt_but_no_crash_route_set_
 
     crash_gdf_1 = pd.concat(crash_grp_sub_no_empty_df_set)
 
@@ -173,33 +226,30 @@ def merge_aadt_crash(aadt_gdf_, crash_gdf_, crash_num_years=5, quiet=True):
         )
         .sort_values(["route_id", "aadt_interval_left"])
     )
+
     aadt_crash_gdf_ = gpd.GeoDataFrame(aadt_crash_df_, geometry="geometry_aadt")
     aadt_crash_gdf_.crs = "EPSG:4326"
 
-    aadt_but_no_crash_route_set_ = set(aadt_but_no_crash_route_list_)
     return aadt_crash_gdf_, aadt_but_no_crash_route_set_
 
 
-def bin_aadt_crash(aadt_grp_sub_, crash_grp_sub_):
+def get_aadt_bin(aadt_grp_sub_):
     """
-    Function to bin AADT data and create a crosswalk between the AADT data spatial
-    boundaries and crash data spatial boundaries.
+    Function to bin AADT data.
     Parameters
     ----------
     aadt_grp_sub_: gpd.GeoDataFrame()
         AADT data for one route in one county.
-    crash_grp_sub_
-        Crash data for the aadt_grp_sub_ data route and county.
+
     Returns
     -------
     {
-        "aadt_grp_sub": aadt_grp_sub_,
-        "crash_grp_sub_aadt_interval_long": crash_grp_sub_aadt_interval_long_,
+        "aadt_grp_sub_1": aadt_grp_sub_1,
+        "aadt_lrs_bins": aadt_lrs_bins,
     } : dict
-        AADT data for one route in one county with corrected interval boundaries and a
-        column for defining interval.
-        Crash data with a crosswalk between the crash data spatial boundaries and AADT
-        data spatial boundaries.
+        aadt_lrs_bins: aadt intervals for crash binning
+        aadt_grp_sub_1: AADT data for one route in one county with corrected interval
+        boundaries and a column for defining interval.`
     """
     # Create bins for grouping the data.
     # Find if the aadt data has intervals that overlap with each other. Remove the overlap
@@ -207,25 +257,43 @@ def bin_aadt_crash(aadt_grp_sub_, crash_grp_sub_):
     # of 1st interval is after the start point of 2nd interval, use the start point of
     # 2nd interval as the end point of 1st interval.
     # Recompute interval length with corrected interval boundaries.
-    aadt_grp_sub_ = aadt_grp_sub_.sort_values(["st_mp_pt"]).assign(
+    aadt_grp_sub_1 = aadt_grp_sub_.sort_values(["st_mp_pt"]).assign(
         st_mp_pt_shift1=lambda df: df.st_mp_pt.shift(-1).fillna(df.end_mp_pt),
         overlapping_interval=lambda df: (df.st_mp_pt_shift1 - df.end_mp_pt).lt(0),
         end_mp_pt_cor=lambda df: df[["end_mp_pt", "st_mp_pt_shift1"]].min(axis=1),
         st_end_diff=lambda df: df.end_mp_pt - df.st_mp_pt,
     )
-    if aadt_grp_sub_.overlapping_interval.any():
+    if aadt_grp_sub_1.overlapping_interval.any():
         print(
             f"Fixing issue with overlapping interval in "
-            f"route {aadt_grp_sub_[['route_class', 'route_qual', 'route_no', 'route_county']].head(1)}"
+            f"route {aadt_grp_sub_1[['route_class', 'route_qual', 'route_no', 'route_county']].head(1)}"
             f" for the following rows: \n"
-            f"{aadt_grp_sub_.loc[aadt_grp_sub_.overlapping_interval, ['st_mp_pt', 'end_mp_pt', 'st_mp_pt_shift1', 'end_mp_pt_cor']]}"
+            f"{aadt_grp_sub_1.loc[aadt_grp_sub_1.overlapping_interval, ['st_mp_pt', 'end_mp_pt', 'st_mp_pt_shift1', 'end_mp_pt_cor']]}"
         )
 
     # Create interval index from aadt data that would be used to cut the crash data.
     aadt_lrs_bins = pd.IntervalIndex.from_arrays(
-        aadt_grp_sub_.st_mp_pt, aadt_grp_sub_.end_mp_pt_cor, closed="left"
+        aadt_grp_sub_1.st_mp_pt, aadt_grp_sub_1.end_mp_pt_cor, closed="left"
     )
-    aadt_grp_sub_.loc[:, "aadt_interval"] = aadt_lrs_bins
+    aadt_grp_sub_1.loc[:, "aadt_interval"] = aadt_lrs_bins
+    return {"aadt_grp_sub_1": aadt_grp_sub_1, "aadt_lrs_bins":aadt_lrs_bins}
+
+
+def bin_aadt_crash(aadt_lrs_bins, crash_grp_sub_):
+    """
+    Function to bin AADT data and create a crosswalk between the AADT data spatial
+    boundaries and crash data spatial boundaries.
+    Parameters
+    ----------
+    aadt_lrs_bins: pd.IntervalIndex
+        AADT intervals
+    crash_grp_sub_
+        Crash data for the aadt_grp_sub_ data route and county.
+    Returns
+    -------
+        Crash data with a crosswalk between the crash data spatial boundaries and AADT
+        data spatial boundaries.
+    """
 
     # Find overlaping intervals between the crash and aadt data.
     crash_grp_sub_aadt_interval_ = crash_grp_sub_.copy()
@@ -278,10 +346,7 @@ def bin_aadt_crash(aadt_grp_sub_, crash_grp_sub_):
             "end_mp_pt",
         ],
     )
-    return {
-        "aadt_grp_sub": aadt_grp_sub_,
-        "crash_grp_sub_aadt_interval_long": crash_grp_sub_aadt_interval_long_,
-    }
+    return crash_grp_sub_aadt_interval_long_
 
 
 def scale_crash_by_seg_len(crash_gdf_2_):
@@ -394,13 +459,14 @@ if __name__ == "__main__":
     # Get a count of missing data.
     # ************************************************************************************
     aadt_crash_gdf_test, aadt_but_no_crash_route_set_test = merge_aadt_crash(
-        aadt_gdf_=aadt_gdf.query("route_id == '10000440092'"),
+        aadt_gdf_=aadt_gdf_95_40, crash_gdf_=crash_gdf_95_40, quiet=True
+    )
+    aadt_crash_gdf_test, aadt_but_no_crash_route_set_test = merge_aadt_crash(
+        aadt_gdf_=aadt_gdf.query("route_id == '10000495092'"),
         crash_gdf_=crash_gdf,
         quiet=True
     )
-    aadt_crash_gdf_test, aadt_but_no_crash_route_set_test = merge_aadt_crash(
-        aadt_gdf_=aadt_gdf_95_40, crash_gdf_=crash_gdf_95_40, quiet=True
-    )
+
     aadt_crash_gdf, aadt_but_no_crash_route_set = merge_aadt_crash(
         aadt_gdf_=aadt_gdf, crash_gdf_=crash_gdf, quiet=True
     )
@@ -411,6 +477,11 @@ if __name__ == "__main__":
 
     # Ouput the file showing routes with AADT but no crash data.
     # ************************************************************************************
+
+    failed_merge_aadt_crash_dat = get_missing_aadt_gdf(
+        aadt_crash_gdf, aadt_but_no_crash_route_set
+    )
+
     failed_merge_aadt_dat = get_missing_aadt_gdf(
         aadt_gdf, aadt_but_no_crash_route_set
     ).sort_values(["route_id", "st_mp_pt"])

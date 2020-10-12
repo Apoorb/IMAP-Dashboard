@@ -29,6 +29,21 @@ def plot_cdf_pdf(crash_df_fil_si_geom_gdf_no_nan_,
                  loc_y=LOC_Y,
                  title_="2015-2019 Severity Index CDF",
                  img_file_="severity_index_cdf_2015_2019"):
+    """
+
+    Parameters
+    ----------
+    crash_df_fil_si_geom_gdf_no_nan_
+    quantile_90th_
+    loc_x
+    loc_y
+    title_
+    img_file_
+
+    Returns
+    -------
+
+    """
     si_cdf_plot = sns.distplot(
         crash_df_fil_si_geom_gdf_no_nan_.severity_index, hist_kws={"cumulative": True},
         kde_kws={"cumulative": True},
@@ -61,6 +76,22 @@ def plot_facet_cdf_pdf(crash_df_fil_si_geom_gdf_no_nan_,
                        img_file_="severity_index_cdf_2015_2019_rt_cls",
                        facet_col_="route_class",
                        sharex_=True):
+    """
+
+    Parameters
+    ----------
+    crash_df_fil_si_geom_gdf_no_nan_
+    loc_x
+    loc_y
+    title_
+    img_file_
+    facet_col_
+    sharex_
+
+    Returns
+    -------
+
+    """
     si_cdf_plot_rt_cls = sns.FacetGrid(
         crash_df_fil_si_geom_gdf_no_nan_, col=facet_col_, height=4, aspect=1,
         sharex=sharex_
@@ -86,6 +117,16 @@ def plot_facet_cdf_pdf(crash_df_fil_si_geom_gdf_no_nan_,
 
 
 def apply_kmeans_cluster_plot(crash_df_fil_si_geom_gdf_no_nan_):
+    """
+
+    Parameters
+    ----------
+    crash_df_fil_si_geom_gdf_no_nan_
+
+    Returns
+    -------
+
+    """
     X = crash_df_fil_si_geom_gdf_no_nan_.severity_index.values.reshape(-1, 1)
     kmeans_si = KMeans(n_clusters=2, random_state=0).fit(X)
     list(kmeans_si.labels_)
@@ -109,8 +150,8 @@ def apply_kmeans_cluster_plot(crash_df_fil_si_geom_gdf_no_nan_):
     fig_kmean_si, ax_kmean_si = plt.subplots()
     for n in range(n_clusters):
         # Filter data points to plot each in turn.
-        ys = crash_df_fil_si_geom_gdf_no_nan.severity_index.values[Z == n]
-        xs = crash_df_fil_si_geom_gdf_no_nan.severity_index.index[Z == n]
+        ys = crash_aadt_fil_si_geom_gdf_no_nan.severity_index.values[Z == n]
+        xs = crash_aadt_fil_si_geom_gdf_no_nan.severity_index.index[Z == n]
         ax_kmean_si.scatter(xs, ys, color=colors[n])
         ax_kmean_si.yaxis.set_major_locator(loc_y_centroid)
     ax_kmean_si.set_title("Severity Index Points by Cluster")
@@ -124,31 +165,37 @@ if __name__ == "__main__":
     path_to_prj_dir = get_project_root()
     path_interim_data = os.path.join(path_to_prj_dir, "data", "interim")
     path_processed_data = os.path.join(path_to_prj_dir, "data", "processed")
-    path_crash_si = os.path.join(path_interim_data, "aadt_crash_ncdot.gpkg")
+    path_crash_aadt_si = os.path.join(path_interim_data, "aadt_crash_ncdot.gpkg")
     path_to_fig = os.path.join(path_to_prj_dir, "reports", "figures")
     path_hpms_2018_nc_fil = os.path.join(
         path_interim_data, "nhs_hpms_2018_routes.csv"
     )
     hpms_2018_nc_fil = pd.read_csv(path_hpms_2018_nc_fil)
-    crash_df_fil_si_geom_gdf = gpd.read_file(path_crash_si, driver="gpkg")
-    crash_df_fil_si_geom_gdf = crash_df_fil_si_geom_gdf.assign(
-        route_class=lambda df: df.route_class.replace(
-            {1: "Interstate", 2: "US Route", 3: "NC Route", 4:"Secondary Routes"}
-        )).query("route_class in ['Interstate', 'US Route', 'NC Route']")
-    crash_df_fil_si_geom_gdf_no_nan = crash_df_fil_si_geom_gdf.query(
+    crash_aadt_fil_si_geom_gdf = gpd.read_file(path_crash_aadt_si, driver="gpkg")
+
+    crash_aadt_fil_si_geom_gdf = (
+        crash_aadt_fil_si_geom_gdf
+        .assign(
+            route_class=lambda df: df.route_class.replace(
+                {1: "Interstate", 2: "US Route", 3: "NC Route", 4: "Secondary Routes"},
+            )
+        )
+        .query("route_class in ['Interstate', 'US Route', 'NC Route']")
+        )
+    crash_aadt_fil_si_geom_gdf_no_nan = crash_aadt_fil_si_geom_gdf.query(
         "~ severity_index.isna()"
     )
-    crash_df_fil_si_geom_gdf.groupby("route_class").severity_index.quantile(.95)
-    crash_df_fil_si_geom_gdf_no_nan.severity_index.describe()
-    quantile_90th = crash_df_fil_si_geom_gdf.severity_index.quantile(.90)
-    plot_cdf_pdf(crash_df_fil_si_geom_gdf_no_nan,
+    crash_aadt_fil_si_geom_gdf.groupby("route_class").severity_index.quantile(.95)
+    crash_aadt_fil_si_geom_gdf_no_nan.severity_index.describe()
+    quantile_90th = crash_aadt_fil_si_geom_gdf.severity_index.quantile(.90)
+    plot_cdf_pdf(crash_aadt_fil_si_geom_gdf_no_nan,
                  quantile_90th_=quantile_90th)
 
     plt.rcParams.update({'font.size': 14,
                          'xtick.labelsize':10})
-    plot_facet_cdf_pdf(crash_df_fil_si_geom_gdf_no_nan)
+    plot_facet_cdf_pdf(crash_aadt_fil_si_geom_gdf_no_nan)
     plot_facet_cdf_pdf(
-        crash_df_fil_si_geom_gdf_no_nan_=crash_df_fil_si_geom_gdf_no_nan,
+        crash_df_fil_si_geom_gdf_no_nan_=crash_aadt_fil_si_geom_gdf_no_nan,
         loc_x=LOC_X,
         loc_y=LOC_Y,
         title_="2015-2019 Severity Index CDF for Different Route Class",
@@ -156,5 +203,5 @@ if __name__ == "__main__":
         facet_col_="route_class",
         sharex_=False)
 
-    apply_kmeans_cluster_plot(crash_df_fil_si_geom_gdf_no_nan)
-    set(hpms_2018_nc_fil.route_numb) - set(crash_df_fil_si_geom_gdf.route_no.unique())
+    apply_kmeans_cluster_plot(crash_aadt_fil_si_geom_gdf_no_nan)
+    set(hpms_2018_nc_fil.route_numb) - set(crash_aadt_fil_si_geom_gdf.route_no.unique())
