@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 from src.utils import get_project_root
-from src.data.make_dataset import read_shp
+from src.utils import read_shp
 
 
 def filter_npmrds_columns(npmrds_gdf_):

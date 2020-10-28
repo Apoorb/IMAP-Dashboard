@@ -6,7 +6,7 @@ import pandas as pd
 import os
 from src.utils import get_project_root
 import geopandas as gpd
-
+import numpy as np
 
 def get_strategic_trans_cor():
     """
@@ -24,6 +24,7 @@ def get_strategic_trans_cor():
         I,77
         I,74
         I,85
+        I,285
         US,29
         NC,87
         US,1
@@ -73,7 +74,7 @@ def test_all_stc_in_study_gdf(
         stc DataFrame with routes in stc but not in aadt or crash data.
     """
     study_routes = pd.DataFrame(
-        study_gdf[merge_cols]
+        study_gdf.loc[:, merge_cols]
         .drop_duplicates(subset=merge_cols)
         .reset_index(drop=True)
         .assign(
@@ -104,12 +105,24 @@ def routes_in_hpms_2018_nhs(hpms_2018_nc_, stc_df_):
         Dataframe with a columns "stc" that is true if an NHS route is also a STC route.
     """
     hpms_2018_nc_fil_ = (
-        hpms_2018_nc_.query("nhs != 0")
+        hpms_2018_nc_
         .replace({"route_sign": {2: "I", 3: "US", 4: "NC"}})
         .query("route_sign in ['I', 'US', 'NC']")
-        .assign(nhs_net=True)
+        .assign(nhs_net=lambda df: np.select(
+            [
+                df.nhs == 0,
+                df.nhs != 0
+             ],
+            [
+                False,
+                True
+            ],
+            np.nan
+            ).astype(bool)
+        )
         .filter(
             items=[
+                "route_id",
                 "route_sign",
                 "route_numb",
                 "route_qual",
@@ -118,18 +131,17 @@ def routes_in_hpms_2018_nhs(hpms_2018_nc_, stc_df_):
                 "strahnet_t",
             ]
         )
-        .drop_duplicates(["route_sign", "route_numb"])
+        .drop_duplicates(["route_id"])
+        .rename(columns={"route_sign": "route_class", "route_numb": "route_no"})
     )
-
     hpms_2018_nc_fil_stc = (
         hpms_2018_nc_fil_.merge(
             stc_df_,
-            left_on=["route_sign", "route_numb"],
-            right_on=["route_class", "route_no"],
+            on=["route_class", "route_no"],
             how="outer",
         )
         .assign(stc=lambda df: df.stc.fillna(False))
-        .sort_values(["route_numb", "route_numb"])
+        .sort_values(["route_class", "route_no"])
     )
     return hpms_2018_nc_fil_stc
 
@@ -143,66 +155,72 @@ if __name__ == "__main__":
     path_to_prj_dir = get_project_root()
     path_to_prj_data = os.path.join(path_to_prj_dir, "data", "raw")
     path_interim_data = os.path.join(path_to_prj_dir, "data", "interim")
-    path_crash_si = os.path.join(path_interim_data, "nc_crash_si_2015_2019.gpkg")
     path_aadt_nc = os.path.join(path_interim_data, "ncdot_2018_aadt.gpkg")
-    path_aadt_crash = os.path.join(path_interim_data, "aadt_crash_ncdot.gpkg")
     path_hpms_2018 = os.path.join(
         path_to_prj_data, "hpms_northcarolina2018", "NorthCarolina_PR_2018.shp"
     )
     hpms_2018_nc = gpd.read_file(path_hpms_2018)
-    crash_df_fil_si_geom_gdf = gpd.read_file(path_crash_si, driver="gpkg")
-    aadt_df = gpd.read_file(path_aadt_nc, driver="gpkg")
+    aadt_gdf = gpd.read_file(path_aadt_nc, driver="gpkg")
+    aadt_gdf_fil = aadt_gdf.loc[lambda df: df.route_class.isin([1, 2, 3])]
     stc_df = get_strategic_trans_cor().assign(stc=True)
-    aadt_crash_gdf = gpd.read_file(path_aadt_crash, driver="gpkg")
 
     # Test for missing stc routes in aadt or crash data.
     # ************************************************************************************
-    test_all_stc_in_study_gdf(crash_df_fil_si_geom_gdf, stc_df)
-    test_all_stc_in_study_gdf(aadt_df, stc_df)
-
+    test_all_stc_in_study_gdf(aadt_gdf_fil, stc_df)
+    # Get I, US, or NC routes in aadt_gdf_fil, but not in hpms_2018_nc
+    # ************************************************************************************
+    routes_in_aadt_not_hpms = set(aadt_gdf_fil.route_id) - set(hpms_2018_nc.route_id)
+    aadt_gdf_fil_test_missing_routes = aadt_gdf_fil.loc[
+        lambda df: df.route_id.isin(routes_in_aadt_not_hpms)
+    ]
+    print(f"HPMS has info on all routes in the AADT layer expect for the following"
+          f" :{aadt_gdf_fil_test_missing_routes.route_id.values}")
     # Find routes in hpms nhs and not in stc
     # ************************************************************************************
     hpms_2018_nc_fil = routes_in_hpms_2018_nhs(
         hpms_2018_nc_=hpms_2018_nc, stc_df_=stc_df
     )
+    # Get route IDs with NHS and STC info
+    # ************************************************************************************
+    hpms_2018_nc_fil_1 = hpms_2018_nc_fil.filter(items=["route_id", "stc", "nhs_net"])
+    aadt_gdf_fil_route = aadt_gdf_fil.filter(items=["route_id"]).drop_duplicates()
+    aadt_nhs_stc_df = aadt_gdf_fil_route.merge(hpms_2018_nc_fil_1, on="route_id", how="left")
+    aadt_nhs_stc_df[["stc", "nhs_net"]] = aadt_nhs_stc_df[["stc", "nhs_net"]].fillna(False)
+    aadt_nhs_stc_df.columns
+    aadt_nhs_stc_df = (
+        aadt_nhs_stc_df
+        .assign(
+            nat_imp_fac=lambda df: np.select(
+                [
+                    df.nhs_net == True,
+                    (df.stc == True) & (df.nhs_net == False),
+                    (df.stc == False) & (df.nhs_net == False)
+                ],
+                [
+                    1.2,
+                    1.1,
+                    1
+                ],
+                "error"
+            ),
+            nat_imp_cat=lambda df: np.select(
+                [
+                    df.nhs_net == True,
+                    (df.stc == True) & (df.nhs_net == False),
+                    (df.stc == False) & (df.nhs_net == False),
+                ],
+                [
+                    "nhs",
+                    "stc_but_not_nhs",
+                    "other"
+                ],
+                "error"
+            ),
+        )
+    )
     # Output routes in hpms nhs and not in stc
     # ************************************************************************************
     out_path_hpms_2018_nc_fil = os.path.join(
-        path_interim_data, "nhs_hpms_2018_routes.csv"
+        path_interim_data, "nhs_hpms_stc_routes.csv"
     )
-    hpms_2018_nc_fil.to_csv(out_path_hpms_2018_nc_fil, index=False)
-
-    # Routes not in AADT data
-    # ************************************************************************************
-    print(
-        f"{set(hpms_2018_nc_fil.route_numb) - set(aadt_df.route_no)} "
-        f"routes not in aadt data"
-    )
-
-    # Find routes in hpms nhs and not in stc. Keep all NHS line segments.
-    # Don't drop duplicates. Will plot in GIS.
-    # ************************************************************************************
-    hpms_2018_nc_fil_all = (
-        hpms_2018_nc.query("nhs != 0")
-        .replace({"route_sign": {2: "I", 3: "US", 4: "NC"}})
-        .query("route_sign in ['I', 'US', 'NC']")
-        .assign(nhs_net=True)
-    )
-    hpms_2018_nc_fil_all = hpms_2018_nc_fil_all.merge(
-        stc_df, left_on=["route_numb"], right_on=["route_no"], how="outer",
-    ).assign(stc=lambda df: df.stc.fillna(False))
-
-    out_file_hpms_stc = os.path.join(
-        path_interim_data, "hpms_2018_nhs_stc_gis_visual_check.gpkg"
-    )
-    hpms_2018_nc_fil_all.to_file(out_file_hpms_stc, driver="GPKG")
-
-    # Find routes in aadt_crash_gdf that are in HPMS NHS.
-    # ************************************************************************************
-    # Drop route_class for merge for now
-    hpms_2018_routes = set(hpms_2018_nc_fil.route_numb)
-    aadt_crash_gdf_nhs = aadt_crash_gdf.query("route_no in @hpms_2018_routes")
-    out_file_aadt_crash_nhs = os.path.join(
-        path_interim_data, "", "aadt_crash_nhs_gis_visual_check_v1.shp"
-    )
-    aadt_crash_gdf_nhs.to_file(out_file_aadt_crash_nhs)
+    aadt_nhs_stc_df.to_csv(out_path_hpms_2018_nc_fil, index=False)

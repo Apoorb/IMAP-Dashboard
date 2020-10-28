@@ -27,6 +27,8 @@ def plot_cdf_pdf(crash_df_fil_si_geom_gdf_no_nan_,
                  quantile_90th_,
                  loc_x=LOC_X,
                  loc_y=LOC_Y,
+                 y_var="severity_index",
+                 y_label="Severity Index",
                  title_="2015-2019 Severity Index CDF",
                  img_file_="severity_index_cdf_2015_2019"):
     """
@@ -45,13 +47,13 @@ def plot_cdf_pdf(crash_df_fil_si_geom_gdf_no_nan_,
 
     """
     si_cdf_plot = sns.distplot(
-        crash_df_fil_si_geom_gdf_no_nan_.severity_index, hist_kws={"cumulative": True},
+        crash_df_fil_si_geom_gdf_no_nan_[y_var], hist_kws={"cumulative": True},
         kde_kws={"cumulative": True},
     )
     sns.distplot(
-        crash_df_fil_si_geom_gdf_no_nan_.severity_index,
+        crash_df_fil_si_geom_gdf_no_nan_[y_var],
         ax=si_cdf_plot,
-        axlabel="Severity Index",
+        axlabel=y_label,
     )
     si_cdf_plot.set_title(title_)
     if bool(loc_x):
@@ -59,19 +61,22 @@ def plot_cdf_pdf(crash_df_fil_si_geom_gdf_no_nan_,
     if bool(loc_y):
         si_cdf_plot.yaxis.set_major_locator(loc_y)
     plt.axvline(quantile_90th_, color='red')
-    plt.text(quantile_90th_-10, 0.90, r"$90^{th}$"+"\nPercentile\n= 8.62%", fontsize=10)
+    plt.text(quantile_90th_-10, 0.90, r"$90^{th}$"+"\nPercentile\n= "f"{round(quantile_90th_,2)}", fontsize=10)
     si_cdf_plot_fig = si_cdf_plot.get_figure()
     plt.tight_layout()
     si_cdf_plot_fig.set_size_inches(6, 4)
     si_cdf_plot_fig.savefig(
         fname=os.path.join(path_to_fig, f"{img_file_}.png")
     )
+    plt.close()
     return 0
 
 
 def plot_facet_cdf_pdf(crash_df_fil_si_geom_gdf_no_nan_,
                        loc_x=LOC_X,
                        loc_y=LOC_Y,
+                       y_var="severity_index",
+                       y_label="Severity Index",
                        title_="2015-2019 Severity Index CDF for Different Route Class",
                        img_file_="severity_index_cdf_2015_2019_rt_cls",
                        facet_col_="route_class",
@@ -97,10 +102,10 @@ def plot_facet_cdf_pdf(crash_df_fil_si_geom_gdf_no_nan_,
         sharex=sharex_
     )
     si_cdf_plot_rt_cls.map(
-        sns.distplot, "severity_index", hist_kws={"cumulative": True},
+        sns.distplot, y_var, hist_kws={"cumulative": True},
         kde_kws={"cumulative": True}
     )
-    si_cdf_plot_rt_cls.map(sns.distplot, "severity_index", color="orange")
+    si_cdf_plot_rt_cls.map(sns.distplot, y_var, color="orange")
     for ax in si_cdf_plot_rt_cls.axes.flat:
         if bool(loc_x):
             ax.xaxis.set_major_locator(loc_x)
@@ -108,11 +113,12 @@ def plot_facet_cdf_pdf(crash_df_fil_si_geom_gdf_no_nan_,
             ax.yaxis.set_major_locator(loc_y)
     plt.subplots_adjust(top=0.85)
     si_cdf_plot_rt_cls.fig.suptitle(title_)
-    si_cdf_plot_rt_cls.set_xlabels("Severity Index")
+    si_cdf_plot_rt_cls.set_xlabels(y_label)
     plt.tight_layout()
     si_cdf_plot_rt_cls.savefig(
         fname=os.path.join(path_to_fig, f"{img_file_}.png")
     )
+    plt.close()
     return 0
 
 
@@ -187,9 +193,9 @@ if __name__ == "__main__":
     )
     crash_aadt_fil_si_geom_gdf.groupby("route_class").severity_index.quantile(.95)
     crash_aadt_fil_si_geom_gdf_no_nan.severity_index.describe()
-    quantile_90th = crash_aadt_fil_si_geom_gdf.severity_index.quantile(.90)
+    quantile_90th_si = crash_aadt_fil_si_geom_gdf.severity_index.quantile(.90)
     plot_cdf_pdf(crash_aadt_fil_si_geom_gdf_no_nan,
-                 quantile_90th_=quantile_90th)
+                 quantile_90th_=quantile_90th_si)
 
     plt.rcParams.update({'font.size': 14,
                          'xtick.labelsize':10})
@@ -198,10 +204,35 @@ if __name__ == "__main__":
         crash_df_fil_si_geom_gdf_no_nan_=crash_aadt_fil_si_geom_gdf_no_nan,
         loc_x=LOC_X,
         loc_y=LOC_Y,
+        y_var="severity_index",
+        y_label="Severity Index",
         title_="2015-2019 Severity Index CDF for Different Route Class",
         img_file_="severity_index_cdf_2015_2019_rt_cls_vary_scale",
         facet_col_="route_class",
         sharex_=False)
+
+    quantile_90th_inc_fac = crash_aadt_fil_si_geom_gdf.inc_fac.quantile(.90)
+    crash_aadt_fil_si_geom_gdf.inc_fac.describe()
+    plot_cdf_pdf(crash_df_fil_si_geom_gdf_no_nan_=crash_aadt_fil_si_geom_gdf_no_nan,
+                 quantile_90th_=quantile_90th_inc_fac,
+                 loc_x=None,
+                 loc_y=LOC_Y,
+                 y_var="inc_fac",
+                 y_label="Incident Factor",
+                 title_="Incident Factor",
+                 img_file_="inc_fac_cdf")
+
+    plot_facet_cdf_pdf(
+        crash_df_fil_si_geom_gdf_no_nan_=crash_aadt_fil_si_geom_gdf_no_nan,
+        loc_x=None,
+        loc_y=LOC_Y,
+        y_var="inc_fac",
+        y_label="Incident Factor",
+        title_="Incident Factor CDF for Different Route Class",
+        img_file_="inc_fac_cdf_rt_cls",
+        facet_col_="route_class",
+        sharex_=True
+    )
 
     apply_kmeans_cluster_plot(crash_aadt_fil_si_geom_gdf_no_nan)
     set(hpms_2018_nc_fil.route_numb) - set(crash_aadt_fil_si_geom_gdf.route_no.unique())

@@ -7,7 +7,7 @@ Created by: Apoorba Bibeka
 import os
 import pandas as pd
 from src.utils import get_project_root
-from src.data.make_dataset import read_shp
+from src.utils import read_shp
 
 
 def add_aadt_new_cols_fix_dtypes(aadt_gdf_):
@@ -106,7 +106,7 @@ if __name__ == "__main__":
     set(aadt_df_add_col.route_no.unique())
     # Filter AADT data to 1: interstate, 2: US Route, 3: NC Route, 4: Secondary Route.
     # ************************************************************************************
-    max_highway_class = 4
+    max_highway_class = 3
     aadt_df_fil = aadt_df_add_col.loc[lambda df: df.route_class <= max_highway_class]
     # Filter AADT data to rows with valid geometry. Set CRS to 4326.
     # ************************************************************************************

@@ -8,7 +8,7 @@ import os
 import pandas as pd
 import geopandas as gpd
 from src.utils import get_project_root
-from src.data.make_dataset import read_shp
+from src.utils import read_shp
 
 
 def fix_crash_dat_type(crash_df_):
@@ -128,7 +128,7 @@ if __name__ == "__main__":
     set(crash_df_add_col.route_no.unique())
     # Filter crash data to 1: interstate, 2: US Route, 3: NC Route, 4: Secondary Route.
     # ************************************************************************************
-    max_highway_class = 4
+    max_highway_class = 3
     crash_df_fil = crash_df_add_col.loc[lambda df: df.route_class <= max_highway_class]
     test_crash_dat(crash_df_fil)
     # Get severity index.

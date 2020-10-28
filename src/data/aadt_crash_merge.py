@@ -452,21 +452,19 @@ if __name__ == "__main__":
     crash_gdf = crash_gdf.query("route_class in [1, 2, 3]").sort_values(
         ["route_gis", "st_mp_pt"]
     )
-    crash_gdf_95_40 = crash_gdf.query("route_no in [40, 95]")
-    aadt_gdf_95_40 = aadt_gdf.query("route_no in [40, 95]")
-
+    # crash_gdf_95_40 = crash_gdf.query("route_no in [40, 95]")
+    # aadt_gdf_95_40 = aadt_gdf.query("route_no in [40, 95]")
     # Merge aadt and crash data. Fix issues with overlapping intervals.
     # Get a count of missing data.
     # ************************************************************************************
-    aadt_crash_gdf_test, aadt_but_no_crash_route_set_test = merge_aadt_crash(
-        aadt_gdf_=aadt_gdf_95_40, crash_gdf_=crash_gdf_95_40, quiet=True
-    )
-    aadt_crash_gdf_test, aadt_but_no_crash_route_set_test = merge_aadt_crash(
-        aadt_gdf_=aadt_gdf.query("route_id == '10000495092'"),
-        crash_gdf_=crash_gdf,
-        quiet=True
-    )
-
+    # aadt_crash_gdf_test, aadt_but_no_crash_route_set_test = merge_aadt_crash(
+    #     aadt_gdf_=aadt_gdf_95_40, crash_gdf_=crash_gdf_95_40, quiet=True
+    # )
+    # aadt_crash_gdf_test, aadt_but_no_crash_route_set_test = merge_aadt_crash(
+    #     aadt_gdf_=aadt_gdf.query("route_id == '10000495092'"),
+    #     crash_gdf_=crash_gdf,
+    #     quiet=True
+    # )
     aadt_crash_gdf, aadt_but_no_crash_route_set = merge_aadt_crash(
         aadt_gdf_=aadt_gdf, crash_gdf_=crash_gdf, quiet=True
     )
@@ -474,21 +472,14 @@ if __name__ == "__main__":
     # ************************************************************************************
     out_file_aadt_crash = os.path.join(path_interim_data, "aadt_crash_ncdot.gpkg")
     aadt_crash_gdf.to_file(out_file_aadt_crash, driver="GPKG")
-
     # Ouput the file showing routes with AADT but no crash data.
     # ************************************************************************************
-
     failed_merge_aadt_crash_dat = get_missing_aadt_gdf(
         aadt_crash_gdf, aadt_but_no_crash_route_set
     )
-
     failed_merge_aadt_dat = get_missing_aadt_gdf(
         aadt_gdf, aadt_but_no_crash_route_set
     ).sort_values(["route_id", "st_mp_pt"])
     failed_merge_crash_dat = get_missing_crash_gdf(
         crash_gdf, aadt_but_no_crash_route_set
     ).sort_values(["route_gis", "st_mp_pt"])
-    out_file_aadt_but_no_crash_route_set = os.path.join(
-        path_interim_data, "aadt_but_no_crash_route_set.csv"
-    )
-    failed_merge_aadt_dat.to_csv(out_file_aadt_but_no_crash_route_set)
