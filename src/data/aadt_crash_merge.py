@@ -57,11 +57,11 @@ def merge_aadt_crash(aadt_gdf_, crash_gdf_, crash_num_years=5, quiet=True):
         except KeyError as err:
             print(f"No Crash data for route {err.args}")
             aadt_but_no_crash_route_list_.append(aadt_grp_key)
-            #continue
+            # continue
         else:
             crash_grp_sub_dict[aadt_grp_key] = bin_aadt_crash(
                 aadt_lrs_bins=aadt_bin_df_dict["aadt_lrs_bins"],
-                crash_grp_sub_=crash_grp_sub
+                crash_grp_sub_=crash_grp_sub,
             )
     aadt_gdf_1 = pd.concat(aadt_grp_sub_dict.values()).sort_values(
         ["route_id", "st_mp_pt"]
@@ -83,8 +83,7 @@ def merge_aadt_crash(aadt_gdf_, crash_gdf_, crash_num_years=5, quiet=True):
 
     if len(crash_grp_sub_no_empty_df_set) == 0:
         aadt_crash_df_ = (
-            aadt_gdf_1
-            .assign(
+            aadt_gdf_1.assign(
                 aadt_interval_left=lambda df: pd.IntervalIndex(df.aadt_interval).left,
                 aadt_interval_right=lambda df: pd.IntervalIndex(df.aadt_interval).right,
                 st_end_diff_aadt=lambda df: df.st_end_diff,
@@ -99,7 +98,7 @@ def merge_aadt_crash(aadt_gdf_, crash_gdf_, crash_num_years=5, quiet=True):
                 inc_fac=np.nan,
                 severity_index=np.nan,
                 crash_rate_per_mile_per_year=np.nan,
-                geometry_aadt=lambda df : df.geometry
+                geometry_aadt=lambda df: df.geometry,
             )
             .filter(
                 items=[
@@ -276,7 +275,7 @@ def get_aadt_bin(aadt_grp_sub_):
         aadt_grp_sub_1.st_mp_pt, aadt_grp_sub_1.end_mp_pt_cor, closed="left"
     )
     aadt_grp_sub_1.loc[:, "aadt_interval"] = aadt_lrs_bins
-    return {"aadt_grp_sub_1": aadt_grp_sub_1, "aadt_lrs_bins":aadt_lrs_bins}
+    return {"aadt_grp_sub_1": aadt_grp_sub_1, "aadt_lrs_bins": aadt_lrs_bins}
 
 
 def bin_aadt_crash(aadt_lrs_bins, crash_grp_sub_):

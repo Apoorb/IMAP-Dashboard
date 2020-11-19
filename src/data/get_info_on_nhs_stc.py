@@ -8,6 +8,7 @@ from src.utils import get_project_root
 import geopandas as gpd
 import numpy as np
 
+
 def get_strategic_trans_cor():
     """
     Create a dataframe for North Carolina strategic transportation routes.
@@ -105,19 +106,11 @@ def routes_in_hpms_2018_nhs(hpms_2018_nc_, stc_df_):
         Dataframe with a columns "stc" that is true if an NHS route is also a STC route.
     """
     hpms_2018_nc_fil_ = (
-        hpms_2018_nc_
-        .replace({"route_sign": {2: "I", 3: "US", 4: "NC"}})
+        hpms_2018_nc_.replace({"route_sign": {2: "I", 3: "US", 4: "NC"}})
         .query("route_sign in ['I', 'US', 'NC']")
-        .assign(nhs_net=lambda df: np.select(
-            [
-                df.nhs == 0,
-                df.nhs != 0
-             ],
-            [
-                False,
-                True
-            ],
-            np.nan
+        .assign(
+            nhs_net=lambda df: np.select(
+                [df.nhs == 0, df.nhs != 0], [False, True], np.nan
             ).astype(bool)
         )
         .filter(
@@ -135,11 +128,7 @@ def routes_in_hpms_2018_nhs(hpms_2018_nc_, stc_df_):
         .rename(columns={"route_sign": "route_class", "route_numb": "route_no"})
     )
     hpms_2018_nc_fil_stc = (
-        hpms_2018_nc_fil_.merge(
-            stc_df_,
-            on=["route_class", "route_no"],
-            how="outer",
-        )
+        hpms_2018_nc_fil_.merge(stc_df_, on=["route_class", "route_no"], how="outer",)
         .assign(stc=lambda df: df.stc.fillna(False))
         .sort_values(["route_class", "route_no"])
     )
@@ -173,8 +162,10 @@ if __name__ == "__main__":
     aadt_gdf_fil_test_missing_routes = aadt_gdf_fil.loc[
         lambda df: df.route_id.isin(routes_in_aadt_not_hpms)
     ]
-    print(f"HPMS has info on all routes in the AADT layer expect for the following"
-          f" :{aadt_gdf_fil_test_missing_routes.route_id.values}")
+    print(
+        f"HPMS has info on all routes in the AADT layer expect for the following"
+        f" :{aadt_gdf_fil_test_missing_routes.route_id.values}"
+    )
     # Find routes in hpms nhs and not in stc
     # ************************************************************************************
     hpms_2018_nc_fil = routes_in_hpms_2018_nhs(
@@ -184,39 +175,32 @@ if __name__ == "__main__":
     # ************************************************************************************
     hpms_2018_nc_fil_1 = hpms_2018_nc_fil.filter(items=["route_id", "stc", "nhs_net"])
     aadt_gdf_fil_route = aadt_gdf_fil.filter(items=["route_id"]).drop_duplicates()
-    aadt_nhs_stc_df = aadt_gdf_fil_route.merge(hpms_2018_nc_fil_1, on="route_id", how="left")
-    aadt_nhs_stc_df[["stc", "nhs_net"]] = aadt_nhs_stc_df[["stc", "nhs_net"]].fillna(False)
+    aadt_nhs_stc_df = aadt_gdf_fil_route.merge(
+        hpms_2018_nc_fil_1, on="route_id", how="left"
+    )
+    aadt_nhs_stc_df[["stc", "nhs_net"]] = aadt_nhs_stc_df[["stc", "nhs_net"]].fillna(
+        False
+    )
     aadt_nhs_stc_df.columns
-    aadt_nhs_stc_df = (
-        aadt_nhs_stc_df
-        .assign(
-            nat_imp_fac=lambda df: np.select(
-                [
-                    df.nhs_net == True,
-                    (df.stc == True) & (df.nhs_net == False),
-                    (df.stc == False) & (df.nhs_net == False)
-                ],
-                [
-                    1.2,
-                    1.1,
-                    1
-                ],
-                "error"
-            ),
-            nat_imp_cat=lambda df: np.select(
-                [
-                    df.nhs_net == True,
-                    (df.stc == True) & (df.nhs_net == False),
-                    (df.stc == False) & (df.nhs_net == False),
-                ],
-                [
-                    "nhs",
-                    "stc_but_not_nhs",
-                    "other"
-                ],
-                "error"
-            ),
-        )
+    aadt_nhs_stc_df = aadt_nhs_stc_df.assign(
+        nat_imp_fac=lambda df: np.select(
+            [
+                df.nhs_net == True,
+                (df.stc == True) & (df.nhs_net == False),
+                (df.stc == False) & (df.nhs_net == False),
+            ],
+            [1, 0.5, 0],
+            "error",
+        ),
+        nat_imp_cat=lambda df: np.select(
+            [
+                df.nhs_net == True,
+                (df.stc == True) & (df.nhs_net == False),
+                (df.stc == False) & (df.nhs_net == False),
+            ],
+            ["nhs", "stc_but_not_nhs", "other"],
+            "error",
+        ),
     )
     # Output routes in hpms nhs and not in stc
     # ************************************************************************************

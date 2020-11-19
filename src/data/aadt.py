@@ -91,10 +91,10 @@ if __name__ == "__main__":
     # Load NCDOT 2018 aadt data.
     # ************************************************************************************
     path_to_prj_dir = get_project_root()
-    path_to_prj_data = os.path.join(path_to_prj_dir, "data", "raw")
+    path_to_raw = os.path.join(path_to_prj_dir, "data", "raw")
     path_interim_data = os.path.join(path_to_prj_dir, "data", "interim")
     aadt_file = os.path.join(
-        path_to_prj_data, "NCDOT 2018 Traffic Segments Shapefile Description"
+        path_to_raw, "NCDOT 2018 Traffic Segments Shapefile Description"
     )
     aadt_gdf = read_shp(aadt_file)
     # Test if there is missing values for AADT data.

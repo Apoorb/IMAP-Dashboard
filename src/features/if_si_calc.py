@@ -59,13 +59,13 @@ if __name__ == "__main__":
         severity_index_scaled=lambda df: (
             df.groupby("severity_index_need_scaling")
             .severity_index
-            .transform(lambda x: minmax_scale(x, (1, 1.2)))),
+            .transform(lambda x: minmax_scale(x, (0, 1)))),
     )
 
     crash_aadt_fil_si_geom_gdf_scaled_si.loc[
         lambda x: ~ x.severity_index_need_scaling.astype(bool),
         "severity_index_scaled"
-        ] = 1.2
+        ] = 1
     crash_aadt_fil_si_geom_gdf_scaled_si.to_file(path_inc_fac_si, driver="GPKG")
 
     path_missing_crash = os.path.join(path_processed_data, "missing_crashes")

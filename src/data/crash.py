@@ -116,9 +116,9 @@ if __name__ == "__main__":
     # Load NCDOT 2015-2019 crash data.
     # ************************************************************************************
     path_to_prj_dir = get_project_root()
-    path_to_prj_data = os.path.join(path_to_prj_dir, "data", "raw")
+    path_to_raw = os.path.join(path_to_prj_dir, "data", "raw")
     path_interim_data = os.path.join(path_to_prj_dir, "data", "interim")
-    crash_file = os.path.join(path_to_prj_data, "SectionScores_2015_2019")
+    crash_file = os.path.join(path_to_raw, "SectionScores_2015_2019")
     crash_gdf = read_shp(file=crash_file)
     crash_gdf_geom_4326 = crash_gdf.to_crs(epsg=4326).geometry
     crash_df = pd.DataFrame(crash_gdf.drop(columns="geometry"))
