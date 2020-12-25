@@ -1,13 +1,12 @@
-# local package
--e .
-
-# external requirements
-
-inflection~=0.5.1
-pandas~=1.1.1
-geopandas~=0.8.1
-setuptools~=49.6.0
-plotly~=4.9.0
-seaborn~=0.10.1
-matplotlib~=3.3.1
-scikit-learn~=0.23.2
+pandas==1.1.1
+numpy==1.19.1
+geopandas==0.8.1
+inflection==0.5.1
+scikit-learn==0.23.2
+plotly==4.9.0
+folium==0.11.0
+branca==0.4.1
+seaborn==0.10.1
+shapely==1.7.0
+matplotlib==3.3.1
+setuptools==49.6.0
