@@ -12,6 +12,8 @@ from src.utils import read_shp
 
 def add_aadt_new_cols_fix_dtypes(aadt_gdf_):
     """
+    Add new columns to the "NCDOT 2018 AADT Traffic Segment Data" AADT data and fix data
+    type for features.
     Parameters
     ----------
     aadt_gdf_: gpd.GeoDataFrame()
@@ -58,6 +60,8 @@ def add_aadt_new_cols_fix_dtypes(aadt_gdf_):
 
 def test_aadt_df(aadt_gdf_):
     """
+    Test if there is missing data. Need to have values for all geometry for the crs
+    porjection conversions to work.
     Parameters
     ----------
     aadt_gdf_: gpd.GeoDataFrame()

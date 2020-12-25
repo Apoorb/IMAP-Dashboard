@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Clean crash data for all Interstates, US Routes, NC Routes, and secondary route in North
-Carolina.
+Clean "2015 – 2019 Section Safety Scores" crash data for all Interstates, US Routes,
+NC Routes, and secondary route in North Carolina.
 Created by: Apoorba Bibeka
 """
 import os
@@ -13,13 +13,15 @@ from src.utils import read_shp
 
 def fix_crash_dat_type(crash_df_):
     """
+    Fix data for "2015 – 2019 Section Safety Scores" data and filter to relevant columns.
     Parameters
     ----------
-    crash_df_
-
+    crash_df_: pd.Dataframe()
+        Crash data.
     Returns
     -------
-
+    crash_df_add_col_
+        Crash data with additional columns.
     """
     crash_df_add_col_ = crash_df_.assign(
         route_gis=lambda df: df.route_gis.astype(str).str.split(".", expand=True)[0],
@@ -84,6 +86,7 @@ def get_severity_index(
     crash_df_fil_, ka_si_factor=76.8, bc_si_factor=8.4, ou_si_factor=1
 ):
     """
+    Function to compute severity index.
     Parameters
     ----------
     crash_df_fil_: pd.DataFrame
